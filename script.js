@@ -1,4 +1,3 @@
-
 const startBtn = document.getElementById("startBtn");
 const home = document.getElementById("home");
 const scanner = document.getElementById("scanner");
