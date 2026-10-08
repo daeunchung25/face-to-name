@@ -23,4 +23,3 @@ startBtn.addEventListener("click", async function() {
     statusText.textContent = "Camera access failed. Please allow camera permission.";
   }
 });
-
