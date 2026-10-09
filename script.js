@@ -387,4 +387,388 @@ function computeSignals(m, useBaseline = true) {
     frown: avg(a("mouthFrownLeft"), a("mouthFrownRight")),
   };
 
-  // How much
+  // How much each feature is "doing" right now (roughly 0–1)
+  s.regions = {
+    leftBrow: browUpL + browDownL,
+    rightBrow: browUpR + browDownR,
+    leftEye: squintL + wideL,
+    rightEye: squintR + wideR,
+    mouth: Math.max(
+      s.smile,
+      s.frown,
+      a("mouthPucker"),
+      a("mouthFunnel"),
+      avg(a("mouthStretchLeft"), a("mouthStretchRight"))
+    ),
+  };
+
+  // Overall expressiveness of this frame (talking/jaw counts for less)
+  s.intensity =
+    (s.browUp + s.browDown + s.smile + s.frown + s.eyeWide + s.eyeSquint + s.browAsym + s.jaw * 0.5) / 4;
+
+  return s;
+}
+
+function classify(s) {
+  if (s.smile > T.smile) return "joy";
+  if (s.browUp > T.browRaiseOn && (s.eyeWide > T.wideEyes || s.jaw > T.surpriseJaw)) return "surprise";
+  if (s.browAsym > T.oneBrowOn || (s.smirk > T.smirk && s.smile > 0.08)) return "skeptic";
+  if (s.browDown > T.furrowOn || s.frown > T.frown) return "focus";
+  return "neutral";
+}
+
+// Counts an event once when the value crosses "on", and resets when it drops below "off"
+function edge(name, value, on, off) {
+  if (!state.active[name] && value > on) {
+    state.active[name] = true;
+    state.events[name]++;
+  } else if (state.active[name] && value < off) {
+    state.active[name] = false;
+  }
+}
+
+function record(m, dt) {
+  const s = computeSignals(m);
+  state.faceFrames++;
+  state.faceSeconds += dt;
+  state.intensitySum += s.intensity;
+
+  if (s.smile > T.smile) {
+    state.smileFrames++;
+    if (s.eyeSquint > T.genuineEyes) state.genuineFrames++;
+  }
+
+  edge("browRaise", s.browUp, T.browRaiseOn, T.browRaiseOff);
+  edge("furrow", s.browDown, T.furrowOn, T.furrowOff);
+  edge("blink", s.blink, T.blinkOn, T.blinkOff);
+  edge("oneBrow", s.browAsym, T.oneBrowOn, T.oneBrowOff);
+
+  const emotion = classify(s);
+  state.emotions[emotion]++;
+
+  const blinking = s.blink > 0.4;
+  for (const [key, value] of Object.entries(s.regions)) {
+    if (blinking && key.endsWith("Eye")) continue; // blinks aren't "expressions"
+    addStat(state.regions[key], value);
+  }
+
+  const p = state.prompts[state.promptIndex];
+  p.intensity += s.intensity;
+  p.n++;
+  p.emotions[emotion]++;
+
+  updateMeters(s);
+}
+
+function updateMeters(s) {
+  const pct = (v) => `${Math.min(100, v * 160)}%`;
+  $("m-brows").style.width = pct(Math.max(s.browUp, s.browDown));
+  $("m-eyes").style.width = pct(Math.max(s.eyeSquint, s.eyeWide));
+  $("m-smile").style.width = pct(s.smile);
+  $("m-jaw").style.width = pct(s.jaw);
+}
+
+/* ---------------- Results ---------------- */
+
+function finish() {
+  state.phase = "done";
+  stopCamera();
+
+  if (state.faceFrames < 60) {
+    showScreen("intro");
+    setStatus("Your face was only visible for a moment. Sit facing the camera in good light and press Start again.");
+    return;
+  }
+  renderCards(buildResults());
+  showScreen("results");
+}
+
+const pctOf = (part, whole) => (whole ? Math.round((100 * part) / whole) : 0);
+const topKey = (obj) => Object.keys(obj).reduce((a, b) => (obj[b] > obj[a] ? b : a));
+
+function buildResults() {
+  const frames = state.faceFrames;
+
+  const emotionPct = {};
+  for (const k in state.emotions) emotionPct[k] = pctOf(state.emotions[k], frames);
+
+  const regionSpread = {};
+  for (const k in state.regions) regionSpread[k] = stdDev(state.regions[k]);
+  const topRegion = topKey(regionSpread);
+
+  let bestPrompt = 0;
+  let bestAvg = -1;
+  state.prompts.forEach((p, i) => {
+    const a = p.n > 5 ? p.intensity / p.n : -1;
+    if (a > bestAvg) { bestAvg = a; bestPrompt = i; }
+  });
+  const bestPromptEmotion = topKey(state.prompts[bestPrompt].emotions);
+
+  const meanIntensity = state.intensitySum / frames;
+  const score = Math.round(100 * Math.min(1, Math.sqrt(meanIntensity / T.fullScoreIntensity)));
+
+  const minutes = Math.max(state.faceSeconds, 1) / 60;
+
+  const r = {
+    seconds: Math.round(state.faceSeconds),
+    frames,
+    smilePct: pctOf(state.smileFrames, frames),
+    genuinePct: pctOf(state.genuineFrames, state.smileFrames),
+    smileFrames: state.smileFrames,
+    events: { ...state.events },
+    blinkRate: Math.round(state.events.blink / minutes),
+    emotionPct,
+    regionSpread,
+    topRegion,
+    bestPrompt: PROMPTS[bestPrompt],
+    bestPromptEmotion,
+    score,
+  };
+  r.persona = pickPersona(r);
+  return r;
+}
+
+function pickPersona(r) {
+  const e = r.emotionPct;
+  const ranked = ["joy", "surprise", "skeptic", "focus"].sort((a, b) => e[b] - e[a]);
+  const [first, second] = ranked;
+
+  const noun = e.neutral >= 65 || e[first] < 6 ? "neutral" : first;
+
+  let adjective;
+  if (noun === "neutral") adjective = r.score < 30 ? "Certified" : "Mysterious";
+  else if (r.score >= 75) adjective = "Unfiltered";
+  else if (r.events.oneBrow >= 3 && noun !== "skeptic") adjective = "Skeptical";
+  else if (e[second] >= 6) adjective = EMOTION_ADJ[second];
+  else if (r.score <= 25) adjective = "Low-Key";
+  else if (r.smilePct >= 15 && r.genuinePct < 35) adjective = "Polite";
+  else adjective = "Steady";
+
+  return {
+    name: `The ${adjective} ${NOUNS[noun].name}`,
+    desc: `${NOUNS[noun].desc} ${ADJECTIVES[adjective]}`,
+  };
+}
+
+/* ---------------- Card templates ---------------- */
+
+const count = (n, unit = "") =>
+  `<span class="count" data-to="${n}">${REDUCED_MOTION ? n : 0}</span>${unit ? `<span class="unit">${unit}</span>` : ""}`;
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+function bars(rows) {
+  const max = Math.max(...rows.map((r) => r.value), 0.0001);
+  return `<div class="bars">${rows
+    .map(
+      (r) => `<div class="bar-row"><span>${r.label}</span>
+        <div class="bar-track"><div class="bar-fill" style="--w:${Math.round((r.value / max) * 100)}%"></div></div>
+        <b>${r.display ?? ""}</b></div>`
+    )
+    .join("")}</div>`;
+}
+
+function featureColor(region) {
+  if (region.endsWith("Brow")) return "var(--bubble)";
+  if (region.endsWith("Eye")) return "var(--mint)";
+  return "var(--butter)";
+}
+
+function featureDeco(region) {
+  if (region.endsWith("Brow")) return DECO.brows;
+  if (region.endsWith("Eye")) return DECO.eye;
+  return DECO.smile;
+}
+
+function buildCards(r) {
+  const ev = r.events;
+
+  // Smile card copy
+  let smileBody;
+  if (r.smileFrames === 0) smileBody = "Not a single smile registered. Tough crowd.";
+  else {
+    let quip = "A healthy mix of real smiles and polite ones.";
+    if (r.smilePct < 5) quip = "Smiles were rare, so every one of them counted.";
+    else if (r.genuinePct >= 60) quip = "Most of those were the real thing, eyes and all.";
+    else if (r.genuinePct < 30) quip = "The rest were polite. We noticed.";
+    smileBody = `${r.genuinePct}% of those smiles reached your eyes. ${quip}`;
+  }
+
+  // Eyebrow card copy
+  let browBody = `You furrowed them ${plural(ev.furrow, "time")}, too.`;
+  if (ev.oneBrow > 0) browBody += ` And ${plural(ev.oneBrow, "time")} you raised just one. Iconic.`;
+
+  // Score card copy
+  let scoreBody = "You keep things close. A raised eyebrow from you means something.";
+  if (r.score >= 75) scoreBody = "Your face is an open book. Large print.";
+  else if (r.score >= 45) scoreBody = "Expressive when it counts, calm when it doesn't.";
+
+  const regionRows = Object.keys(REGIONS)
+    .map((k) => ({ label: REGIONS[k].short, value: r.regionSpread[k] }))
+    .sort((a, b) => b.value - a.value);
+
+  const emotionRows = Object.keys(EMOTIONS)
+    .map((k) => ({ label: EMOTIONS[k].label, value: r.emotionPct[k], display: `${r.emotionPct[k]}%` }))
+    .sort((a, b) => b.value - a.value);
+  const topNonNeutral = emotionRows.find((row) => row.label !== "Neutral");
+
+  return [
+    {
+      bg: "var(--cobalt)", fg: "var(--milk)", deco: DECO.face,
+      html: `<p class="kicker">Your face had a lot to say.</p>
+        <p class="big">${count(r.seconds, "sec")}</p>
+        <p class="body">${r.frames.toLocaleString()} frames of eyebrows, eyes, and smiles. Here's what we found.</p>
+        <p class="tap-hint">Tap or swipe to continue</p>`,
+    },
+    {
+      bg: "var(--butter)", fg: "var(--ink)", deco: DECO.smile,
+      html: `<p class="kicker">You smiled for</p>
+        <p class="big">${count(r.smilePct, "%")}</p>
+        <p class="body">of the session. ${smileBody}</p>`,
+    },
+    {
+      bg: "var(--bubble)", fg: "var(--ink)", deco: DECO.brows,
+      html: `<p class="kicker">You raised your eyebrows</p>
+        <p class="big">${count(ev.browRaise, ev.browRaise === 1 ? "time" : "times")}</p>
+        <p class="body">${browBody}</p>`,
+    },
+    {
+      bg: featureColor(r.topRegion), fg: "var(--ink)", deco: featureDeco(r.topRegion),
+      html: `<p class="kicker">Your most expressive feature</p>
+        <p class="big words">${REGIONS[r.topRegion].label}</p>
+        ${bars(regionRows)}
+        <p class="body">${REGION_QUIPS[r.topRegion]}</p>`,
+    },
+    {
+      bg: "var(--mint)", fg: "var(--ink)", deco: DECO.blink,
+      html: `<p class="kicker">You blinked</p>
+        <p class="big">${count(ev.blink, ev.blink === 1 ? "time" : "times")}</p>
+        <p class="body">That's about ${r.blinkRate} a minute. A relaxed person usually lands somewhere around 15 to 20.</p>`,
+    },
+    {
+      bg: "var(--cobalt)", fg: "var(--milk)", deco: DECO.face,
+      html: `<p class="kicker">Your face came alive when we said</p>
+        <p class="big quote">“${r.bestPrompt}”</p>
+        <p class="body">Your strongest reaction of the session, and it was mostly ${EMOTIONS[r.bestPromptEmotion].word}.</p>`,
+    },
+    {
+      bg: "var(--milk)", fg: "var(--ink)", deco: DECO.eye,
+      html: `<p class="kicker">Your expression mix</p>
+        <p class="big words">Mostly ${emotionRows[0].label.toLowerCase()}</p>
+        ${bars(emotionRows)}
+        <p class="body">${
+          emotionRows[0].label === "Neutral" && topNonNeutral
+            ? `When your face did move, it leaned toward ${topNonNeutral.label.toLowerCase()}.`
+            : "Every frame was sorted into one of these five."
+        }</p>`,
+    },
+    {
+      bg: "var(--bubble)", fg: "var(--ink)", deco: DECO.face,
+      html: `<p class="kicker">Your expressiveness score</p>
+        <p class="big">${count(r.score, "/100")}</p>
+        <p class="body">${scoreBody}</p>`,
+    },
+    {
+      bg: "var(--ink)", fg: "var(--milk)", deco: DECO.face,
+      html: `<p class="kicker">You are</p>
+        <p class="big words">${r.persona.name}</p>
+        <p class="body">${r.persona.desc}</p>
+        <dl class="summary">
+          <div><dt>Smiling</dt><dd>${r.smilePct}%</dd></div>
+          <div><dt>Eyebrow raises</dt><dd>${ev.browRaise}</dd></div>
+          <div><dt>Top feature</dt><dd>${REGIONS[r.topRegion].short}</dd></div>
+          <div><dt>Score</dt><dd>${r.score}/100</dd></div>
+        </dl>
+        <button class="btn" data-action="restart">Run it again</button>`,
+    },
+  ];
+}
+
+/* ---------------- Story navigation ---------------- */
+
+let cardEls = [];
+let cardIndex = 0;
+let cardData = [];
+
+function renderCards(results) {
+  cardData = buildCards(results);
+  const cards = $("cards");
+  cards.innerHTML = cardData
+    .map(
+      (c, i) => `<article class="card" style="--bg:${c.bg};--fg:${c.fg}"
+        aria-roledescription="slide" aria-label="${i + 1} of ${cardData.length}">
+        <div class="deco" aria-hidden="true">${c.deco}</div>${c.html}</article>`
+    )
+    .join("");
+  $("progress").innerHTML = cardData.map(() => "<i></i>").join("");
+  cardEls = [...cards.querySelectorAll(".card")];
+  goTo(0);
+  cards.focus({ preventScroll: true });
+}
+
+function goTo(i) {
+  cardIndex = Math.max(0, Math.min(cardEls.length - 1, i));
+  cardEls.forEach((el, j) => {
+    el.classList.toggle("active", j === cardIndex);
+    el.setAttribute("aria-hidden", String(j !== cardIndex));
+  });
+  [...$("progress").children].forEach((seg, j) => seg.classList.toggle("on", j <= cardIndex));
+  $("story").style.setProperty("--fg", cardData[cardIndex].fg);
+  animateCounts(cardEls[cardIndex]);
+}
+
+function animateCounts(card) {
+  card.querySelectorAll(".count").forEach((el) => {
+    const to = Number(el.dataset.to);
+    if (REDUCED_MOTION || el.dataset.done) {
+      el.textContent = to;
+      return;
+    }
+    el.dataset.done = "1";
+    const start = performance.now();
+    const duration = 900;
+    const step = (t) => {
+      const p = Math.min(1, (t - start) / duration);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+// Tap left side = back, right side = forward. Swipe works too.
+let pointerStart = null;
+$("cards").addEventListener("pointerdown", (e) => {
+  pointerStart = { x: e.clientX, y: e.clientY };
+});
+$("cards").addEventListener("pointerup", (e) => {
+  if (!pointerStart) return;
+  const dx = e.clientX - pointerStart.x;
+  const dy = e.clientY - pointerStart.y;
+  pointerStart = null;
+
+  if (e.target.closest("button")) return; // buttons handle their own clicks
+
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+    goTo(cardIndex + (dx < 0 ? 1 : -1));
+  } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    goTo(cardIndex + (e.clientX - rect.left < rect.width * 0.3 ? -1 : 1));
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (!$("screen-results").classList.contains("active")) return;
+  if (e.key === "ArrowRight") goTo(cardIndex + 1);
+  if (e.key === "ArrowLeft") goTo(cardIndex - 1);
+});
+
+$("cards").addEventListener("click", (e) => {
+  if (e.target.closest("[data-action='restart']")) restart();
+});
+
+function restart() {
+  setStatus("");
+  showScreen("intro");
+  $("startBtn").focus();
+}
