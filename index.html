@@ -2,27 +2,79 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face to Name</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Face Wrapped</title>
+  <meta name="description" content="A 45-second session that reads your facial expressions and wraps them up like a year in review.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
   <main>
-    <section id="home">
-      <p>AN EXPERIMENT IN IDENTITY</p>
-      <h1>FACE<br>TO NAME.</h1>
-      <button id="startBtn">START SCANNING →</button>
+    <!-- ============ 1. INTRO ============ -->
+    <section id="screen-intro" class="screen active" aria-labelledby="title">
+      <div class="intro-text">
+        <h1 id="title">Face<br>Wrapped</h1>
+        <p class="lede">
+          Talk, react, and answer a few prompts for 45 seconds.
+          Then see what your eyebrows, eyes, and smile were saying the whole time.
+        </p>
+        <button id="startBtn" class="btn">Start my session</button>
+        <p class="fine">Everything runs in your browser. Your camera feed is never recorded or uploaded.</p>
+        <p id="introStatus" class="status" role="status" aria-live="polite"></p>
+      </div>
+
+      <!-- Floating facial features: the same colors are used for each feature everywhere on the site -->
+      <svg class="intro-face" viewBox="0 0 300 300" aria-hidden="true">
+        <g class="brows">
+          <path d="M60 95 Q95 68 130 90" />
+          <path d="M170 90 Q205 68 240 95" />
+        </g>
+        <g class="eyes">
+          <circle cx="95" cy="138" r="12" />
+          <circle cx="205" cy="138" r="12" />
+        </g>
+        <path class="lips" d="M85 205 Q150 258 215 205" />
+      </svg>
     </section>
 
-    <section id="scanner" hidden>
-      <h2>YOUR FACE, YOUR NAME.</h2>
-      <p>Look into the camera to begin.</p>
-      <video id="camera" autoplay playsinline muted></video>
-      <p id="status"></p>
+    <!-- ============ 2. SESSION ============ -->
+    <section id="screen-session" class="screen" aria-label="Recording session">
+      <div class="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <p id="noFace" class="noface hidden">Move into the frame so your whole face is visible.</p>
+      </div>
+
+      <div class="panel">
+        <div class="timer" aria-hidden="true"><div id="timerBar"></div></div>
+        <p id="phaseLabel" class="phase">Getting your resting face</p>
+        <h2 id="prompt" aria-live="polite">Relax your face and look at the camera.</h2>
+
+        <div class="meters" aria-hidden="true">
+          <span class="meter-label">Eyebrows</span>
+          <div class="meter"><span id="m-brows" class="c-brows"></span></div>
+          <span class="meter-label">Eyes</span>
+          <div class="meter"><span id="m-eyes" class="c-eyes"></span></div>
+          <span class="meter-label">Smile</span>
+          <div class="meter"><span id="m-smile" class="c-lips"></span></div>
+          <span class="meter-label">Jaw</span>
+          <div class="meter"><span id="m-jaw" class="c-jaw"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3. RESULTS ============ -->
+    <section id="screen-results" class="screen" aria-label="Your Face Wrapped">
+      <div class="story" id="story">
+        <div id="progress" class="progress" aria-hidden="true"></div>
+        <div id="cards" class="cards" tabindex="0" aria-roledescription="carousel"
+             aria-label="Your results. Use the arrow keys, tap, or swipe to move between cards."></div>
+      </div>
     </section>
   </main>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
