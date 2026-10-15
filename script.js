@@ -8,16 +8,16 @@
    2. For the first few seconds we record your RESTING face (baseline),
       so everything after that is measured relative to how your face
       looks when relaxed.
-   3. During the session we count events (eyebrow raises, blinks...),
-      track how much each feature moves, and classify every frame
-      into an expression (joy, surprise, skepticism, concentration, neutral).
-   4. At the end we turn those numbers into swipeable "Wrapped" cards.
+   3. Then we show 8 possible futures (medicine, art, tech...).
+      For each one we measure your "spark": genuine smiles, raised
+      eyebrows, and widened eyes count up; furrows and frowns count down.
+   4. The future with the most spark becomes your dream job, and your
+      expression style gives it a funny adjective ("The Skeptical Surgeon").
    ========================================================= */
 
 import {
   FaceLandmarker,
   FilesetResolver,
-  DrawingUtils,
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 
 const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
@@ -27,7 +27,7 @@ const MODEL_URL =
 /* ---------------- Settings you can tune ---------------- */
 
 const CALIBRATION_SECONDS = 3;
-const SESSION_SECONDS = 45;
+const SECONDS_PER_FUTURE = 7.5;
 
 // MediaPipe's "Left"/"Right" can come out mirrored depending on the camera.
 // If the site says "left eyebrow" when you moved your right one, set this to true.
@@ -40,7 +40,6 @@ const T = {
   genuineEyes: 0.08,   // cheek + eye squint during a smile = a "real" (Duchenne) smile
   browRaiseOn: 0.25, browRaiseOff: 0.12,
   furrowOn: 0.22,    furrowOff: 0.1,
-  blinkOn: 0.5,      blinkOff: 0.3,   // raw values, not baseline-adjusted
   oneBrowOn: 0.2,    oneBrowOff: 0.1,
   smirk: 0.15,
   surpriseJaw: 0.2,
@@ -50,14 +49,27 @@ const T = {
   fullScoreIntensity: 0.18,
 };
 
-const PROMPTS = [
-  "Tell us about the best meal you've ever had.",
-  "Think about your most embarrassing moment. Yes, that one.",
-  "Someone just said pineapple belongs on pizza. React.",
-  "Describe your morning like it's a movie trailer.",
-  "Think of someone you miss.",
-  "Smile like it's your yearbook photo.",
+// Each future: the field, the dream job it leads to, and the scenario shown on screen.
+const FUTURES = [
+  { field: "Medicine",     job: "Surgeon",            line: "High stakes, steady hands.",
+    prompt: "Imagine you're in an operating room, and someone's life is in your hands." },
+  { field: "Art",          job: "Gallery Artist",     line: "Something you made, and people can't look away.",
+    prompt: "Imagine your painting in a gallery, and strangers stopping to stare at it." },
+  { field: "Tech",         job: "App Founder",        line: "Building the thing everyone uses.",
+    prompt: "Imagine building an app that millions of people open every morning." },
+  { field: "Science",      job: "Research Scientist", line: "Being the first to know something.",
+    prompt: "Imagine discovering something nobody in history has ever known." },
+  { field: "Business",     job: "Dealmaker",          line: "The handshake, the win, the room.",
+    prompt: "Imagine closing a million-dollar deal while the whole room watches." },
+  { field: "Teaching",     job: "Teacher",            line: "Changing someone's life, one class at a time.",
+    prompt: "Imagine a former student telling you that you changed their life." },
+  { field: "Performance",  job: "Headliner",          line: "The lights, the crowd, the noise.",
+    prompt: "Imagine walking onto a stage in front of 10,000 screaming people." },
+  { field: "The outdoors", job: "Park Ranger",        line: "Fresh air instead of fluorescent lights.",
+    prompt: "Imagine working outside every day, miles from the nearest desk." },
 ];
+
+const SESSION_SECONDS = FUTURES.length * SECONDS_PER_FUTURE;
 
 /* ---------------- Labels & copy ---------------- */
 
@@ -70,50 +82,52 @@ const REGIONS = {
 };
 
 const REGION_QUIPS = {
-  leftBrow:  "One eyebrow did most of the talking. It has opinions.",
-  rightBrow: "One eyebrow did most of the talking. It has opinions.",
+  leftBrow:  "One eyebrow did most of the deciding. It has opinions about your career.",
+  rightBrow: "One eyebrow did most of the deciding. It has opinions about your career.",
   leftEye:   "Squinting, widening, narrowing. Your eyes reacted before you did.",
   rightEye:  "Squinting, widening, narrowing. Your eyes reacted before you did.",
   mouth:     "Smiles, frowns, smirks. Your mouth did the heavy lifting.",
 };
 
-const EMOTIONS = {
-  joy:      { label: "Joy",           word: "joy" },
-  surprise: { label: "Surprise",      word: "surprise" },
-  skeptic:  { label: "Skepticism",    word: "skepticism" },
-  focus:    { label: "Concentration", word: "concentration" },
-  neutral:  { label: "Neutral",       word: "a perfectly straight face" },
+const EMOTION_WORDS = {
+  joy: "joy",
+  surprise: "surprise",
+  skeptic: "skepticism",
+  focus: "concentration",
+  neutral: "quiet interest",
 };
 
-const NOUNS = {
-  joy:      { name: "Optimist",    desc: "Smiling is your default setting. Even the awkward prompts couldn't keep it down." },
-  surprise: { name: "Dramatist",   desc: "Everything is news to you, and your eyebrows make sure everyone knows it." },
-  skeptic:  { name: "Skeptic",     desc: "You heard every prompt. Your face would like to see some sources." },
-  focus:    { name: "Overthinker", desc: "A furrowed brow, a thinking face. You process everything, visibly." },
-  neutral:  { name: "Poker Face",  desc: `${SESSION_SECONDS} seconds of prompts and your face gave away almost nothing.` },
+// What your face did during the future it liked least
+const HARD_NO = {
+  joy:      "You smiled, but it never quite reached your eyes.",
+  surprise: "Your face looked alarmed. Noted.",
+  skeptic:  "One eyebrow went up, and not in a good way.",
+  focus:    "Your brow furrowed like it was doing taxes.",
+  neutral:  "Your face didn't move. Not even a little.",
 };
 
+// Funny adjectives for the dream job, based on HOW you express yourself.
+// {job} is replaced with the job title.
 const ADJECTIVES = {
-  Sunny:      "With a steady streak of smiles underneath it all.",
-  Dramatic:   "Plus a flair for the big reaction.",
-  Skeptical:  "But one eyebrow was always taking notes.",
-  Brooding:   "With a furrowed brow on standby.",
-  Unfiltered: "And you show all of it. Your face doesn't do subtle.",
-  "Low-Key":  "All delivered at a quiet, steady volume.",
-  Polite:     "Plus a lot of polite smiles that never quite reached your eyes.",
-  Steady:     "Even-keeled, start to finish.",
-  Certified:  "Truly, nothing got through.",
-  Mysterious: "Small flickers here and there, but you kept the full story to yourself.",
+  Cheerful:       "You'd be the {job} who's way too happy at 7 a.m.",
+  Dramatic:       "You'd be the {job} who reacts to every small win like it's the finale.",
+  Skeptical:      "You'd be the {job} who asks for a second opinion on the second opinion.",
+  Overthinking:   "You'd be the {job} with a backup plan for the backup plan.",
+  "Poker-Faced":  "You'd be the {job} nobody can read. Not even your coworkers.",
+  Unfiltered:     "You'd be the {job} whose face says it all before you open your mouth.",
+  Polite:         "You'd be the {job} who smiles through every meeting that could've been an email.",
+  "Low-Key":      "You'd be the {job} who gets it done without anyone noticing the effort.",
+  Steady:         "You'd be the {job} everyone wants around when things go sideways.",
 };
-const EMOTION_ADJ = { joy: "Sunny", surprise: "Dramatic", skeptic: "Skeptical", focus: "Brooding" };
+const EMOTION_ADJ = { joy: "Cheerful", surprise: "Dramatic", skeptic: "Skeptical", focus: "Overthinking" };
 
 // Big line drawings of facial features, shown behind each card
 const DECO = {
   face:  `<svg viewBox="0 0 300 300"><path d="M60 95 Q95 68 130 90"/><path d="M170 90 Q205 68 240 95"/><circle cx="95" cy="138" r="10"/><circle cx="205" cy="138" r="10"/><path d="M85 205 Q150 258 215 205"/></svg>`,
   smile: `<svg viewBox="0 0 300 160"><path d="M30 40 Q150 170 270 40"/></svg>`,
+  frown: `<svg viewBox="0 0 300 160"><path d="M30 130 Q150 10 270 130"/></svg>`,
   brows: `<svg viewBox="0 0 300 120"><path d="M20 95 Q75 20 135 78"/><path d="M165 78 Q225 20 280 95"/></svg>`,
   eye:   `<svg viewBox="0 0 300 160"><path d="M20 80 Q150 -10 280 80 Q150 170 20 80Z"/><circle cx="150" cy="80" r="26"/></svg>`,
-  blink: `<svg viewBox="0 0 300 160"><path d="M20 60 Q150 140 280 60"/><path d="M75 94 L60 132"/><path d="M150 102 L150 146"/><path d="M225 94 L240 132"/></svg>`,
 };
 
 /* ---------------- DOM ---------------- */
@@ -122,8 +136,21 @@ const $ = (id) => document.getElementById(id);
 const video = $("video");
 const overlay = $("overlay");
 const ctx = overlay.getContext("2d");
-const drawer = new DrawingUtils(ctx);
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// The landmark points we draw as dots: eyebrows, eyes, lips, and the face outline
+const DOT_INDICES = [
+  ...new Set(
+    [
+      FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW,
+      FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW,
+      FaceLandmarker.FACE_LANDMARKS_LEFT_EYE,
+      FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE,
+      FaceLandmarker.FACE_LANDMARKS_LIPS,
+      FaceLandmarker.FACE_LANDMARKS_FACE_OVAL,
+    ].flatMap((set) => set.flatMap((c) => [c.start, c.end]))
+  ),
+];
 
 let faceLandmarker = null;
 let stream = null;
@@ -173,12 +200,12 @@ function resetState() {
     smileFrames: 0,
     genuineFrames: 0,
     intensitySum: 0,
-    events: { browRaise: 0, furrow: 0, blink: 0, oneBrow: 0 },
-    active: { browRaise: false, furrow: false, blink: false, oneBrow: false },
+    events: { browRaise: 0, furrow: 0, oneBrow: 0 },
+    active: { browRaise: false, furrow: false, oneBrow: false },
     emotions: emptyEmotions(),
     regions: Object.fromEntries(Object.keys(REGIONS).map((k) => [k, newStat()])),
-    promptIndex: 0,
-    prompts: PROMPTS.map(() => ({ intensity: 0, n: 0, emotions: emptyEmotions() })),
+    futureIndex: 0,
+    futures: FUTURES.map(() => ({ spark: 0, n: 0, browRaises: 0, emotions: emptyEmotions() })),
   };
   lastVideoTime = -1;
   lastProcessed = 0;
@@ -250,6 +277,11 @@ $("startBtn").addEventListener("click", async () => {
   }
 });
 
+function showFuture(i) {
+  $("phaseLabel").textContent = `Future ${i + 1} of ${FUTURES.length}: ${FUTURES[i].field}`;
+  $("prompt").textContent = FUTURES[i].prompt;
+}
+
 function beginPhase(phase) {
   state.phase = phase;
   state.phaseStart = performance.now();
@@ -257,9 +289,8 @@ function beginPhase(phase) {
     $("phaseLabel").textContent = "Getting your resting face";
     $("prompt").textContent = "Relax your face and look at the camera.";
   } else if (phase === "session") {
-    state.promptIndex = 0;
-    $("phaseLabel").textContent = `Prompt 1 of ${PROMPTS.length}`;
-    $("prompt").textContent = PROMPTS[0];
+    state.futureIndex = 0;
+    showFuture(0);
   }
 }
 
@@ -298,12 +329,10 @@ function updateClock(now) {
 
   if (state.phase === "session") {
     $("timerBar").style.width = `${Math.min(100, (elapsed / SESSION_SECONDS) * 100)}%`;
-    const perPrompt = SESSION_SECONDS / PROMPTS.length;
-    const index = Math.min(PROMPTS.length - 1, Math.floor(elapsed / perPrompt));
-    if (index !== state.promptIndex) {
-      state.promptIndex = index;
-      $("phaseLabel").textContent = `Prompt ${index + 1} of ${PROMPTS.length}`;
-      $("prompt").textContent = PROMPTS[index];
+    const index = Math.min(FUTURES.length - 1, Math.floor(elapsed / SECONDS_PER_FUTURE));
+    if (index !== state.futureIndex) {
+      state.futureIndex = index;
+      showFuture(index);
     }
     if (elapsed >= SESSION_SECONDS) finish();
   }
@@ -317,7 +346,7 @@ function handleResult(result, dt) {
   $("noFace").classList.toggle("hidden", Boolean(landmarks));
   if (!landmarks || !shapes) return;
 
-  drawFeatures(landmarks);
+  drawDots(landmarks);
   const m = toMap(shapes.categories);
 
   if (state.phase === "calibrating") {
@@ -329,16 +358,19 @@ function handleResult(result, dt) {
   }
 }
 
-function drawFeatures(lm) {
-  const css = getComputedStyle(document.documentElement);
-  const brows = css.getPropertyValue("--bubble").trim();
-  const eyes = css.getPropertyValue("--mint").trim();
-  const lips = css.getPropertyValue("--butter").trim();
-  drawer.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, { color: brows, lineWidth: 4 });
-  drawer.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW, { color: brows, lineWidth: 4 });
-  drawer.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, { color: eyes, lineWidth: 3 });
-  drawer.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, { color: eyes, lineWidth: 3 });
-  drawer.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_LIPS, { color: lips, lineWidth: 3 });
+// Small, quiet dots on the tracked points (landmark x/y are 0–1, so scale to the canvas)
+function drawDots(lm) {
+  const r = Math.max(1.2, overlay.width / 420);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+  ctx.beginPath();
+  for (const i of DOT_INDICES) {
+    const p = lm[i];
+    const x = p.x * overlay.width;
+    const y = p.y * overlay.height;
+    ctx.moveTo(x + r, y);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+  }
+  ctx.fill();
 }
 
 /* ---------------- Turning blendshapes into signals ---------------- */
@@ -385,7 +417,10 @@ function computeSignals(m, useBaseline = true) {
     blink: avg(m.eyeBlinkLeft || 0, m.eyeBlinkRight || 0), // raw: blinking isn't relative
     jaw: a("jawOpen"),
     frown: avg(a("mouthFrownLeft"), a("mouthFrownRight")),
+    sneer: avg(a("noseSneerLeft"), a("noseSneerRight")),
   };
+
+  s.genuine = s.smile > T.smile && s.eyeSquint > T.genuineEyes;
 
   // How much each feature is "doing" right now (roughly 0–1)
   s.regions = {
@@ -406,6 +441,17 @@ function computeSignals(m, useBaseline = true) {
   s.intensity =
     (s.browUp + s.browDown + s.smile + s.frown + s.eyeWide + s.eyeSquint + s.browAsym + s.jaw * 0.5) / 4;
 
+  // "Spark" = how drawn-in you look. Real smiles, raised brows and wide eyes add;
+  // furrows, frowns and nose wrinkles subtract.
+  s.spark =
+    s.smile +
+    (s.genuine ? s.eyeSquint : 0) +
+    0.6 * s.browUp +
+    0.6 * s.eyeWide -
+    0.5 * s.browDown -
+    0.8 * s.frown -
+    0.8 * s.sneer;
+
   return s;
 }
 
@@ -417,30 +463,33 @@ function classify(s) {
   return "neutral";
 }
 
-// Counts an event once when the value crosses "on", and resets when it drops below "off"
+// Counts an event once when the value crosses "on", and resets when it drops below "off".
+// Returns true on the frame the event starts.
 function edge(name, value, on, off) {
   if (!state.active[name] && value > on) {
     state.active[name] = true;
     state.events[name]++;
-  } else if (state.active[name] && value < off) {
-    state.active[name] = false;
+    return true;
   }
+  if (state.active[name] && value < off) state.active[name] = false;
+  return false;
 }
 
 function record(m, dt) {
   const s = computeSignals(m);
+  const f = state.futures[state.futureIndex];
+
   state.faceFrames++;
   state.faceSeconds += dt;
   state.intensitySum += s.intensity;
 
   if (s.smile > T.smile) {
     state.smileFrames++;
-    if (s.eyeSquint > T.genuineEyes) state.genuineFrames++;
+    if (s.genuine) state.genuineFrames++;
   }
 
-  edge("browRaise", s.browUp, T.browRaiseOn, T.browRaiseOff);
+  if (edge("browRaise", s.browUp, T.browRaiseOn, T.browRaiseOff)) f.browRaises++;
   edge("furrow", s.browDown, T.furrowOn, T.furrowOff);
-  edge("blink", s.blink, T.blinkOn, T.blinkOff);
   edge("oneBrow", s.browAsym, T.oneBrowOn, T.oneBrowOff);
 
   const emotion = classify(s);
@@ -452,10 +501,9 @@ function record(m, dt) {
     addStat(state.regions[key], value);
   }
 
-  const p = state.prompts[state.promptIndex];
-  p.intensity += s.intensity;
-  p.n++;
-  p.emotions[emotion]++;
+  f.spark += s.spark;
+  f.n++;
+  f.emotions[emotion]++;
 
   updateMeters(s);
 }
@@ -496,32 +544,36 @@ function buildResults() {
   for (const k in state.regions) regionSpread[k] = stdDev(state.regions[k]);
   const topRegion = topKey(regionSpread);
 
-  let bestPrompt = 0;
-  let bestAvg = -1;
-  state.prompts.forEach((p, i) => {
-    const a = p.n > 5 ? p.intensity / p.n : -1;
-    if (a > bestAvg) { bestAvg = a; bestPrompt = i; }
-  });
-  const bestPromptEmotion = topKey(state.prompts[bestPrompt].emotions);
+  // Rank the futures by average spark (futures you weren't visible for go last)
+  const ranking = state.futures
+    .map((f, i) => ({
+      ...FUTURES[i],
+      spark: f.n > 5 ? f.spark / f.n : -Infinity,
+      browRaises: f.browRaises,
+      emotion: f.n ? topKey(f.emotions) : "neutral",
+    }))
+    .sort((a, b) => b.spark - a.spark);
+
+  const best = ranking[0];
+  const worst = ranking.filter((f) => f.spark > -Infinity).at(-1);
+  const mostBrows = [...ranking].sort((a, b) => b.browRaises - a.browRaises)[0];
 
   const meanIntensity = state.intensitySum / frames;
   const score = Math.round(100 * Math.min(1, Math.sqrt(meanIntensity / T.fullScoreIntensity)));
 
-  const minutes = Math.max(state.faceSeconds, 1) / 60;
-
   const r = {
-    seconds: Math.round(state.faceSeconds),
     frames,
     smilePct: pctOf(state.smileFrames, frames),
     genuinePct: pctOf(state.genuineFrames, state.smileFrames),
     smileFrames: state.smileFrames,
     events: { ...state.events },
-    blinkRate: Math.round(state.events.blink / minutes),
     emotionPct,
     regionSpread,
     topRegion,
-    bestPrompt: PROMPTS[bestPrompt],
-    bestPromptEmotion,
+    ranking,
+    best,
+    worst,
+    mostBrows,
     score,
   };
   r.persona = pickPersona(r);
@@ -530,23 +582,20 @@ function buildResults() {
 
 function pickPersona(r) {
   const e = r.emotionPct;
-  const ranked = ["joy", "surprise", "skeptic", "focus"].sort((a, b) => e[b] - e[a]);
-  const [first, second] = ranked;
-
-  const noun = e.neutral >= 65 || e[first] < 6 ? "neutral" : first;
+  const topActive = ["joy", "surprise", "skeptic", "focus"].sort((a, b) => e[b] - e[a])[0];
 
   let adjective;
-  if (noun === "neutral") adjective = r.score < 30 ? "Certified" : "Mysterious";
+  if (e.neutral >= 65 || e[topActive] < 6) adjective = "Poker-Faced";
   else if (r.score >= 75) adjective = "Unfiltered";
-  else if (r.events.oneBrow >= 3 && noun !== "skeptic") adjective = "Skeptical";
-  else if (e[second] >= 6) adjective = EMOTION_ADJ[second];
-  else if (r.score <= 25) adjective = "Low-Key";
   else if (r.smilePct >= 15 && r.genuinePct < 35) adjective = "Polite";
+  else if (r.events.oneBrow >= 3) adjective = "Skeptical";
+  else if (e[topActive] >= 6) adjective = EMOTION_ADJ[topActive];
+  else if (r.score <= 25) adjective = "Low-Key";
   else adjective = "Steady";
 
   return {
-    name: `The ${adjective} ${NOUNS[noun].name}`,
-    desc: `${NOUNS[noun].desc} ${ADJECTIVES[adjective]}`,
+    name: `The ${adjective} ${r.best.job}`,
+    joke: ADJECTIVES[adjective].replace("{job}", r.best.job.toLowerCase()),
   };
 }
 
@@ -558,8 +607,10 @@ const count = (n, unit = "") =>
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 function bars(rows) {
-  const max = Math.max(...rows.map((r) => r.value), 0.0001);
-  return `<div class="bars">${rows
+  const min = Math.min(...rows.map((r) => r.value));
+  const shifted = rows.map((r) => ({ ...r, value: r.value - Math.min(0, min) + 0.02 }));
+  const max = Math.max(...shifted.map((r) => r.value), 0.0001);
+  return `<div class="bars">${shifted
     .map(
       (r) => `<div class="bar-row"><span>${r.label}</span>
         <div class="bar-track"><div class="bar-fill" style="--w:${Math.round((r.value / max) * 100)}%"></div></div>
@@ -596,28 +647,23 @@ function buildCards(r) {
 
   // Eyebrow card copy
   let browBody = `You furrowed them ${plural(ev.furrow, "time")}, too.`;
+  if (r.mostBrows.browRaises > 0) browBody = `Most of them went up during ${r.mostBrows.field.toLowerCase()}. ${browBody}`;
   if (ev.oneBrow > 0) browBody += ` And ${plural(ev.oneBrow, "time")} you raised just one. Iconic.`;
-
-  // Score card copy
-  let scoreBody = "You keep things close. A raised eyebrow from you means something.";
-  if (r.score >= 75) scoreBody = "Your face is an open book. Large print.";
-  else if (r.score >= 45) scoreBody = "Expressive when it counts, calm when it doesn't.";
 
   const regionRows = Object.keys(REGIONS)
     .map((k) => ({ label: REGIONS[k].short, value: r.regionSpread[k] }))
     .sort((a, b) => b.value - a.value);
 
-  const emotionRows = Object.keys(EMOTIONS)
-    .map((k) => ({ label: EMOTIONS[k].label, value: r.emotionPct[k], display: `${r.emotionPct[k]}%` }))
-    .sort((a, b) => b.value - a.value);
-  const topNonNeutral = emotionRows.find((row) => row.label !== "Neutral");
+  const rankingRows = r.ranking
+    .filter((f) => f.spark > -Infinity)
+    .map((f) => ({ label: f.field, value: f.spark }));
 
   return [
     {
       bg: "var(--cobalt)", fg: "var(--milk)", deco: DECO.face,
-      html: `<p class="kicker">Your face had a lot to say.</p>
-        <p class="big">${count(r.seconds, "sec")}</p>
-        <p class="body">${r.frames.toLocaleString()} frames of eyebrows, eyes, and smiles. Here's what we found.</p>
+      html: `<p class="kicker">We showed you</p>
+        <p class="big">${count(FUTURES.length, "futures")}</p>
+        <p class="body">Your face reacted to every one of them, whether you meant it to or not. Here's what it said.</p>
         <p class="tap-hint">Tap or swipe to continue</p>`,
     },
     {
@@ -640,44 +686,34 @@ function buildCards(r) {
         <p class="body">${REGION_QUIPS[r.topRegion]}</p>`,
     },
     {
-      bg: "var(--mint)", fg: "var(--ink)", deco: DECO.blink,
-      html: `<p class="kicker">You blinked</p>
-        <p class="big">${count(ev.blink, ev.blink === 1 ? "time" : "times")}</p>
-        <p class="body">That's about ${r.blinkRate} a minute. A relaxed person usually lands somewhere around 15 to 20.</p>`,
+      bg: "var(--milk)", fg: "var(--ink)", deco: DECO.eye,
+      html: `<p class="kicker">How your face ranked your futures</p>
+        <p class="big words">${r.best.field} wins</p>
+        ${bars(rankingRows)}
+        <p class="body">Ranked by spark: real smiles, raised brows, and wide eyes, minus frowns and furrows.</p>`,
     },
     {
       bg: "var(--cobalt)", fg: "var(--milk)", deco: DECO.face,
-      html: `<p class="kicker">Your face came alive when we said</p>
-        <p class="big quote">“${r.bestPrompt}”</p>
-        <p class="body">Your strongest reaction of the session, and it was mostly ${EMOTIONS[r.bestPromptEmotion].word}.</p>`,
+      html: `<p class="kicker">Your face lit up when we said</p>
+        <p class="big quote">“${r.best.prompt}”</p>
+        <p class="body">${r.best.line} You were mostly showing ${EMOTION_WORDS[r.best.emotion]}.</p>`,
     },
     {
-      bg: "var(--milk)", fg: "var(--ink)", deco: DECO.eye,
-      html: `<p class="kicker">Your expression mix</p>
-        <p class="big words">Mostly ${emotionRows[0].label.toLowerCase()}</p>
-        ${bars(emotionRows)}
-        <p class="body">${
-          emotionRows[0].label === "Neutral" && topNonNeutral
-            ? `When your face did move, it leaned toward ${topNonNeutral.label.toLowerCase()}.`
-            : "Every frame was sorted into one of these five."
-        }</p>`,
-    },
-    {
-      bg: "var(--bubble)", fg: "var(--ink)", deco: DECO.face,
-      html: `<p class="kicker">Your expressiveness score</p>
-        <p class="big">${count(r.score, "/100")}</p>
-        <p class="body">${scoreBody}</p>`,
+      bg: "var(--mint)", fg: "var(--ink)", deco: DECO.frown,
+      html: `<p class="kicker">And it quietly said no to</p>
+        <p class="big words">${r.worst.field}</p>
+        <p class="body">${HARD_NO[r.worst.emotion]} Maybe leave that one to someone else.</p>`,
     },
     {
       bg: "var(--ink)", fg: "var(--milk)", deco: DECO.face,
-      html: `<p class="kicker">You are</p>
+      html: `<p class="kicker">Your dream job</p>
         <p class="big words">${r.persona.name}</p>
-        <p class="body">${r.persona.desc}</p>
+        <p class="body">${r.persona.joke}</p>
         <dl class="summary">
+          <div><dt>Top future</dt><dd>${r.best.field}</dd></div>
+          <div><dt>Hard no</dt><dd>${r.worst.field}</dd></div>
           <div><dt>Smiling</dt><dd>${r.smilePct}%</dd></div>
-          <div><dt>Eyebrow raises</dt><dd>${ev.browRaise}</dd></div>
-          <div><dt>Top feature</dt><dd>${REGIONS[r.topRegion].short}</dd></div>
-          <div><dt>Score</dt><dd>${r.score}/100</dd></div>
+          <div><dt>Expressiveness</dt><dd>${r.score}/100</dd></div>
         </dl>
         <button class="btn" data-action="restart">Run it again</button>`,
     },
