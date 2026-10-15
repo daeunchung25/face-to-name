@@ -249,7 +249,7 @@ h1 {
   margin: 10px 0 18px;
 }
 .big .unit { font-size: .4em; letter-spacing: -.01em; margin-left: .15em; }
-.big.words { font-size: clamp(2.6rem, 11vw, 3.7rem); line-height: .95; }
+.big.words { font-size: clamp(2.4rem, 10vw, 3.4rem); line-height: .95; overflow-wrap: break-word; }
 .big.quote { font-size: clamp(1.9rem, 8vw, 2.5rem); line-height: 1.02; letter-spacing: -.02em; font-variation-settings: "wdth" 85; }
 
 .body { font-size: 1.1rem; line-height: 1.4; max-width: 32ch; }
