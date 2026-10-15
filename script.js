@@ -8,10 +8,12 @@
    2. For the first few seconds we record your RESTING face (baseline),
       so everything after that is measured relative to how your face
       looks when relaxed.
-   3. Then we show 8 possible futures (medicine, art, tech...).
-      For each one we measure your "spark": genuine smiles, raised
-      eyebrows, and widened eyes count up; furrows and frowns count down.
-   4. The future with the most spark becomes your dream job, and your
+   3. Then we ask 8 questions to answer out loud. Each one secretly
+      belongs to a field (medicine, art, tech...). While you talk, we
+      measure your "spark": genuine smiles, raised eyebrows, and widened
+      eyes count up; furrows and frowns count down. Talking itself
+      (jaw and lip movement) is ignored.
+   4. The field with the most spark becomes your dream job, and your
       expression style gives it a funny adjective ("The Skeptical Surgeon").
    ========================================================= */
 
@@ -27,7 +29,7 @@ const MODEL_URL =
 /* ---------------- Settings you can tune ---------------- */
 
 const CALIBRATION_SECONDS = 3;
-const SECONDS_PER_FUTURE = 7.5;
+const SECONDS_PER_FUTURE = 10; // time to answer each question out loud
 
 // MediaPipe's "Left"/"Right" can come out mirrored depending on the camera.
 // If the site says "left eyebrow" when you moved your right one, set this to true.
@@ -42,31 +44,31 @@ const T = {
   furrowOn: 0.22,    furrowOff: 0.1,
   oneBrowOn: 0.2,    oneBrowOff: 0.1,
   smirk: 0.15,
-  surpriseJaw: 0.2,
   wideEyes: 0.12,
   frown: 0.12,
   // Expressiveness score: an average intensity of this much = 100/100
   fullScoreIntensity: 0.18,
 };
 
-// Each future: the field, the dream job it leads to, and the scenario shown on screen.
+// Each question secretly belongs to a field. The field is only revealed in the results.
+// field = the career area, job = the dream job it leads to, prompt = the question shown on screen.
 const FUTURES = [
-  { field: "Medicine",     job: "Surgeon",            line: "High stakes, steady hands.",
-    prompt: "Imagine you're in an operating room, and someone's life is in your hands." },
-  { field: "Art",          job: "Gallery Artist",     line: "Something you made, and people can't look away.",
-    prompt: "Imagine your painting in a gallery, and strangers stopping to stare at it." },
+  { field: "Medicine",     job: "Surgeon",            line: "Taking care of people, even when it's hard.",
+    prompt: "Tell us about a time you took care of someone who was sick or hurt." },
+  { field: "Art",          job: "Gallery Artist",     line: "Making things that didn't exist before.",
+    prompt: "Describe something you made that you're proud of." },
   { field: "Tech",         job: "App Founder",        line: "Building the thing everyone uses.",
-    prompt: "Imagine building an app that millions of people open every morning." },
-  { field: "Science",      job: "Research Scientist", line: "Being the first to know something.",
-    prompt: "Imagine discovering something nobody in history has ever known." },
-  { field: "Business",     job: "Dealmaker",          line: "The handshake, the win, the room.",
-    prompt: "Imagine closing a million-dollar deal while the whole room watches." },
-  { field: "Teaching",     job: "Teacher",            line: "Changing someone's life, one class at a time.",
-    prompt: "Imagine a former student telling you that you changed their life." },
+    prompt: "If you could build any app, what would it do? Explain it." },
+  { field: "Science",      job: "Research Scientist", line: "Chasing questions nobody has answered yet.",
+    prompt: "What's a question about the world you've always wanted answered?" },
+  { field: "Business",     job: "Dealmaker",          line: "Convincing a room and closing the deal.",
+    prompt: "Pitch us something you own. Convince us to buy it." },
+  { field: "Teaching",     job: "Teacher",            line: "Making something click for someone else.",
+    prompt: "Teach us something you know really well." },
   { field: "Performance",  job: "Headliner",          line: "The lights, the crowd, the noise.",
-    prompt: "Imagine walking onto a stage in front of 10,000 screaming people." },
+    prompt: "Tell us about the last time you were the center of attention." },
   { field: "The outdoors", job: "Park Ranger",        line: "Fresh air instead of fluorescent lights.",
-    prompt: "Imagine working outside every day, miles from the nearest desk." },
+    prompt: "Describe your favorite place outside. Where is it, and why?" },
 ];
 
 const SESSION_SECONDS = FUTURES.length * SECONDS_PER_FUTURE;
@@ -278,7 +280,7 @@ $("startBtn").addEventListener("click", async () => {
 });
 
 function showFuture(i) {
-  $("phaseLabel").textContent = `Future ${i + 1} of ${FUTURES.length}: ${FUTURES[i].field}`;
+  $("phaseLabel").textContent = `Question ${i + 1} of ${FUTURES.length}. Answer out loud.`;
   $("prompt").textContent = FUTURES[i].prompt;
 }
 
@@ -287,7 +289,7 @@ function beginPhase(phase) {
   state.phaseStart = performance.now();
   if (phase === "calibrating") {
     $("phaseLabel").textContent = "Getting your resting face";
-    $("prompt").textContent = "Relax your face and look at the camera.";
+    $("prompt").textContent = "Relax your face and look at the camera. The questions start in a moment.";
   } else if (phase === "session") {
     state.futureIndex = 0;
     showFuture(0);
@@ -428,18 +430,13 @@ function computeSignals(m, useBaseline = true) {
     rightBrow: browUpR + browDownR,
     leftEye: squintL + wideL,
     rightEye: squintR + wideR,
-    mouth: Math.max(
-      s.smile,
-      s.frown,
-      a("mouthPucker"),
-      a("mouthFunnel"),
-      avg(a("mouthStretchLeft"), a("mouthStretchRight"))
-    ),
+    // Only smiles and frowns count, so normal talking doesn't make the mouth "win"
+    mouth: Math.max(s.smile, s.frown),
   };
 
-  // Overall expressiveness of this frame (talking/jaw counts for less)
+  // Overall expressiveness of this frame (jaw is left out because everyone moves it while talking)
   s.intensity =
-    (s.browUp + s.browDown + s.smile + s.frown + s.eyeWide + s.eyeSquint + s.browAsym + s.jaw * 0.5) / 4;
+    (s.browUp + s.browDown + s.smile + s.frown + s.eyeWide + s.eyeSquint + s.browAsym) / 3.5;
 
   // "Spark" = how drawn-in you look. Real smiles, raised brows and wide eyes add;
   // furrows, frowns and nose wrinkles subtract.
@@ -457,7 +454,7 @@ function computeSignals(m, useBaseline = true) {
 
 function classify(s) {
   if (s.smile > T.smile) return "joy";
-  if (s.browUp > T.browRaiseOn && (s.eyeWide > T.wideEyes || s.jaw > T.surpriseJaw)) return "surprise";
+  if (s.browUp > T.browRaiseOn && s.eyeWide > T.wideEyes) return "surprise";
   if (s.browAsym > T.oneBrowOn || (s.smirk > T.smirk && s.smile > 0.08)) return "skeptic";
   if (s.browDown > T.furrowOn || s.frown > T.frown) return "focus";
   return "neutral";
@@ -661,9 +658,9 @@ function buildCards(r) {
   return [
     {
       bg: "var(--cobalt)", fg: "var(--milk)", deco: DECO.face,
-      html: `<p class="kicker">We showed you</p>
-        <p class="big">${count(FUTURES.length, "futures")}</p>
-        <p class="body">Your face reacted to every one of them, whether you meant it to or not. Here's what it said.</p>
+      html: `<p class="kicker">You answered</p>
+        <p class="big">${count(FUTURES.length, "questions")}</p>
+        <p class="body">Each one was secretly about a different career. Your face reacted while you talked, whether you meant it to or not.</p>
         <p class="tap-hint">Tap or swipe to continue</p>`,
     },
     {
@@ -687,22 +684,22 @@ function buildCards(r) {
     },
     {
       bg: "var(--milk)", fg: "var(--ink)", deco: DECO.eye,
-      html: `<p class="kicker">How your face ranked your futures</p>
+      html: `<p class="kicker">How your face ranked each career</p>
         <p class="big words">${r.best.field} wins</p>
         ${bars(rankingRows)}
         <p class="body">Ranked by spark: real smiles, raised brows, and wide eyes, minus frowns and furrows.</p>`,
     },
     {
       bg: "var(--cobalt)", fg: "var(--milk)", deco: DECO.face,
-      html: `<p class="kicker">Your face lit up when we said</p>
+      html: `<p class="kicker">Your face lit up when we asked</p>
         <p class="big quote">“${r.best.prompt}”</p>
-        <p class="body">${r.best.line} You were mostly showing ${EMOTION_WORDS[r.best.emotion]}.</p>`,
+        <p class="body">That one was secretly about ${r.best.field.toLowerCase()}. ${r.best.line} You were mostly showing ${EMOTION_WORDS[r.best.emotion]}.</p>`,
     },
     {
       bg: "var(--mint)", fg: "var(--ink)", deco: DECO.frown,
       html: `<p class="kicker">And it quietly said no to</p>
         <p class="big words">${r.worst.field}</p>
-        <p class="body">${HARD_NO[r.worst.emotion]} Maybe leave that one to someone else.</p>`,
+        <p class="body">${HARD_NO[r.worst.emotion]} That happened during “${r.worst.prompt}” Maybe leave that one to someone else.</p>`,
     },
     {
       bg: "var(--ink)", fg: "var(--milk)", deco: DECO.face,
@@ -710,7 +707,7 @@ function buildCards(r) {
         <p class="big words">${r.persona.name}</p>
         <p class="body">${r.persona.joke}</p>
         <dl class="summary">
-          <div><dt>Top future</dt><dd>${r.best.field}</dd></div>
+          <div><dt>Top career</dt><dd>${r.best.field}</dd></div>
           <div><dt>Hard no</dt><dd>${r.worst.field}</dd></div>
           <div><dt>Smiling</dt><dd>${r.smilePct}%</dd></div>
           <div><dt>Expressiveness</dt><dd>${r.score}/100</dd></div>
