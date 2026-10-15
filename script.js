@@ -8,7 +8,8 @@
    2. For the first few seconds we record your RESTING face (baseline),
       so everything after that is measured relative to how your face
       looks when relaxed.
-   3. Then we ask 8 questions to answer out loud. Each one secretly
+   3. Then we ask 8 questions to answer out loud, taking as long as you
+      like and pressing "I'm finished" after each one. Each one secretly
       belongs to a field (medicine, art, tech...). While you talk, we
       measure your "spark": genuine smiles, raised eyebrows, and widened
       eyes count up; furrows and frowns count down. Talking itself
@@ -29,7 +30,7 @@ const MODEL_URL =
 /* ---------------- Settings you can tune ---------------- */
 
 const CALIBRATION_SECONDS = 3;
-const SECONDS_PER_FUTURE = 10; // time to answer each question out loud
+// There's no time limit per question: the user presses "I'm finished" to move on.
 
 // MediaPipe's "Left"/"Right" can come out mirrored depending on the camera.
 // If the site says "left eyebrow" when you moved your right one, set this to true.
@@ -70,8 +71,6 @@ const FUTURES = [
   { field: "The outdoors", job: "Park Ranger",        line: "Fresh air instead of fluorescent lights.",
     prompt: "Describe your favorite place outside. Where is it, and why?" },
 ];
-
-const SESSION_SECONDS = FUTURES.length * SECONDS_PER_FUTURE;
 
 /* ---------------- Labels & copy ---------------- */
 
@@ -280,9 +279,22 @@ $("startBtn").addEventListener("click", async () => {
 });
 
 function showFuture(i) {
-  $("phaseLabel").textContent = `Question ${i + 1} of ${FUTURES.length}. Answer out loud.`;
+  $("phaseLabel").textContent = `Question ${i + 1} of ${FUTURES.length}. Answer out loud, as long as you like.`;
   $("prompt").textContent = FUTURES[i].prompt;
+  // The progress bar shows how many questions are done
+  $("timerBar").style.width = `${(i / FUTURES.length) * 100}%`;
 }
+
+// "I'm finished" moves to the next question, or to the results after the last one
+$("nextBtn").addEventListener("click", () => {
+  if (state.phase !== "session") return;
+  if (state.futureIndex < FUTURES.length - 1) {
+    state.futureIndex++;
+    showFuture(state.futureIndex);
+  } else {
+    finish();
+  }
+});
 
 function beginPhase(phase) {
   state.phase = phase;
@@ -290,9 +302,12 @@ function beginPhase(phase) {
   if (phase === "calibrating") {
     $("phaseLabel").textContent = "Getting your resting face";
     $("prompt").textContent = "Relax your face and look at the camera. The questions start in a moment.";
+    $("nextBtn").classList.add("hidden");
   } else if (phase === "session") {
     state.futureIndex = 0;
     showFuture(0);
+    $("nextBtn").classList.remove("hidden");
+    $("nextBtn").focus({ preventScroll: true }); // so Enter or Space also works
   }
 }
 
@@ -326,17 +341,6 @@ function updateClock(now) {
       }
       beginPhase("session");
     }
-    return;
-  }
-
-  if (state.phase === "session") {
-    $("timerBar").style.width = `${Math.min(100, (elapsed / SESSION_SECONDS) * 100)}%`;
-    const index = Math.min(FUTURES.length - 1, Math.floor(elapsed / SECONDS_PER_FUTURE));
-    if (index !== state.futureIndex) {
-      state.futureIndex = index;
-      showFuture(index);
-    }
-    if (elapsed >= SESSION_SECONDS) finish();
   }
 }
 
@@ -517,6 +521,7 @@ function updateMeters(s) {
 
 function finish() {
   state.phase = "done";
+  $("nextBtn").classList.add("hidden");
   stopCamera();
 
   if (state.faceFrames < 60) {
