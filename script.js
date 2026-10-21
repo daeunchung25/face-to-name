@@ -16,6 +16,8 @@
       (jaw and lip movement) is ignored.
    4. The field with the most spark becomes your dream job, and your
       expression style gives it a funny adjective ("The Skeptical Surgeon").
+   5. The last card draws a 1080×1920 image for an Instagram story and
+      lets you share the site with friends.
    ========================================================= */
 
 import {
@@ -153,8 +155,14 @@ const DOT_INDICES = [
   ),
 ];
 
+// The site's own address, used in the share message and on the story image
+const SITE_URL = location.origin + location.pathname.replace(/index\.html$/, "");
+
 let faceLandmarker = null;
 let stream = null;
+let lastResults = null; // results of the most recent session
+let storyFile = null;   // the finished story image, as a File (ready to share)
+let storyUrl = null;    // the same image as a temporary URL (for preview and download)
 let state = null;
 let lastVideoTime = -1;
 let lastProcessed = 0;
@@ -529,8 +537,25 @@ function finish() {
     setStatus("Your face was only visible for a moment. Sit facing the camera in good light and press Start again.");
     return;
   }
-  renderCards(buildResults());
+  const results = buildResults();
+  lastResults = results;
+  storyFile = null;
+  renderCards(results);
   showScreen("results");
+
+  // Draw the story image in the background so it's ready by the last card
+  makeStoryImage(results)
+    .then(({ file, url }) => {
+      if (storyUrl) URL.revokeObjectURL(storyUrl);
+      storyFile = file;
+      storyUrl = url;
+      const img = $("storyPreview");
+      if (img) {
+        img.src = url;
+        img.alt = `Story image: ${results.persona.name}`;
+      }
+    })
+    .catch((err) => console.error("Story image failed:", err));
 }
 
 const pctOf = (part, whole) => (whole ? Math.round((100 * part) / whole) : 0);
@@ -716,8 +741,18 @@ function buildCards(r) {
           <div><dt>Hard no</dt><dd>${r.worst.field}</dd></div>
           <div><dt>Smiling</dt><dd>${r.smilePct}%</dd></div>
           <div><dt>Expressiveness</dt><dd>${r.score}/100</dd></div>
-        </dl>
-        <button class="btn" data-action="restart">Run it again</button>`,
+        </dl>`,
+    },
+    {
+      bg: "var(--bubble)", fg: "var(--ink)", deco: "",
+      html: `<p class="kicker">Take it with you</p>
+        <img id="storyPreview" class="share-preview" alt="">
+        <div class="share-actions">
+          <button class="btn btn-dark" data-action="save">Save for your story</button>
+          <button class="btn btn-line" data-action="share">Share with friends</button>
+        </div>
+        <p id="shareStatus" class="share-status" role="status" aria-live="polite"></p>
+        <button class="btn btn-text" data-action="restart">Run it again</button>`,
     },
   ];
 }
@@ -802,11 +837,234 @@ document.addEventListener("keydown", (e) => {
 });
 
 $("cards").addEventListener("click", (e) => {
-  if (e.target.closest("[data-action='restart']")) restart();
+  const button = e.target.closest("[data-action]");
+  if (!button) return;
+  if (button.dataset.action === "restart") restart();
+  if (button.dataset.action === "save") saveStory();
+  if (button.dataset.action === "share") shareWithFriends();
 });
 
 function restart() {
   setStatus("");
   showScreen("intro");
   $("startBtn").focus();
+}
+
+/* ---------------- Sharing ---------------- */
+
+function setShareStatus(text) {
+  const el = $("shareStatus");
+  if (el) el.textContent = text;
+}
+
+// On a phone, this opens the share sheet so you can pick Instagram (Stories) or "Save Image".
+// On a computer, it downloads the PNG.
+function saveStory() {
+  if (!storyFile) {
+    setShareStatus("Your image is still being made. Try again in a second.");
+    return;
+  }
+  const onPhone = window.matchMedia("(pointer: coarse)").matches;
+  if (onPhone && navigator.canShare && navigator.canShare({ files: [storyFile] })) {
+    navigator.share({ files: [storyFile] }).catch((err) => {
+      if (err.name !== "AbortError") downloadStory();
+    });
+    return;
+  }
+  downloadStory();
+}
+
+function downloadStory() {
+  const a = document.createElement("a");
+  a.href = storyUrl;
+  a.download = storyFile.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setShareStatus("Saved! Open Instagram, start a story, and pick it from your photos.");
+}
+
+// Shares a message + the site link. Falls back to copying it if sharing isn't supported.
+function shareWithFriends() {
+  const text = `My face says my dream job is ${lastResults.persona.name}. Find out yours:`;
+  if (navigator.share) {
+    navigator.share({ title: "Face Wrapped", text, url: SITE_URL }).catch((err) => {
+      if (err.name !== "AbortError") copyLink(text);
+    });
+    return;
+  }
+  copyLink(text);
+}
+
+function copyLink(text) {
+  navigator.clipboard
+    .writeText(`${text} ${SITE_URL}`)
+    .then(() => setShareStatus("Link copied. Paste it to your friends!"))
+    .catch(() => setShareStatus(`Copy this link: ${SITE_URL}`));
+}
+
+/* ---------------- Story image (1080 × 1920, Instagram story size) ---------------- */
+
+const STORY_W = 1080;
+const STORY_H = 1920;
+const STORY_FONT = '"Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif';
+
+// Splits text into lines that fit within maxWidth
+function wrapLines(g, text, maxWidth) {
+  const lines = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    const test = line ? `${line} ${word}` : word;
+    if (g.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function roundedRect(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+async function makeStoryImage(r) {
+  // Make sure the font is loaded before drawing text on the canvas
+  try {
+    await Promise.all(
+      [400, 500, 800].map((w) => document.fonts.load(`${w} 100px "Bricolage Grotesque"`))
+    );
+  } catch (err) {
+    console.warn("Font didn't load, using fallback.", err);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = STORY_W;
+  canvas.height = STORY_H;
+  const g = canvas.getContext("2d");
+
+  const css = getComputedStyle(document.documentElement);
+  const C = {};
+  for (const name of ["cobalt", "bubble", "mint", "butter", "ink", "milk"]) {
+    C[name] = css.getPropertyValue(`--${name}`).trim();
+  }
+  const left = 90;
+  const textWidth = STORY_W - left * 2;
+
+  // Background
+  g.fillStyle = C.cobalt;
+  g.fillRect(0, 0, STORY_W, STORY_H);
+
+  // Wordmark
+  g.textBaseline = "alphabetic";
+  g.fillStyle = C.milk;
+  g.font = `800 52px ${STORY_FONT}`;
+  g.fillText("Face Wrapped", left, 190);
+
+  // The floating face: pink brows, mint eyes, yellow smile (same as the site)
+  g.save();
+  g.translate(285, 200);
+  g.scale(1.7, 1.7);
+  g.lineCap = "round";
+  g.lineWidth = 16;
+  g.strokeStyle = C.bubble;
+  g.stroke(new Path2D("M60 95 Q95 68 130 90"));
+  g.stroke(new Path2D("M170 90 Q205 68 240 95"));
+  g.fillStyle = C.mint;
+  for (const x of [95, 205]) {
+    g.beginPath();
+    g.arc(x, 138, 14, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.strokeStyle = C.butter;
+  g.stroke(new Path2D("M85 205 Q150 258 215 205"));
+  g.restore();
+
+  // "My dream job is" + the persona name, sized to fit
+  let y = 760;
+  g.fillStyle = C.milk;
+  g.globalAlpha = 0.85;
+  g.font = `500 42px ${STORY_FONT}`;
+  g.fillText("My dream job, according to my face:", left, y);
+  g.globalAlpha = 1;
+
+  g.font = `400 40px ${STORY_FONT}`;
+  const jokeLines = wrapLines(g, r.persona.joke, textWidth);
+  const jokeHeight = jokeLines.length * 54;
+
+  const textBottom = 1150;
+  let size = 150;
+  let nameLines;
+  for (; size >= 64; size -= 6) {
+    g.font = `800 ${size}px ${STORY_FONT}`;
+    nameLines = wrapLines(g, r.persona.name, textWidth);
+    const nameHeight = nameLines.length * size * 0.95;
+    if (y + 24 + nameHeight + 36 + jokeHeight <= textBottom) break;
+  }
+
+  y += 24;
+  g.font = `800 ${size}px ${STORY_FONT}`;
+  for (const line of nameLines) {
+    y += size * 0.95;
+    g.fillText(line, left, y);
+  }
+
+  y += 36;
+  g.globalAlpha = 0.9;
+  g.font = `400 40px ${STORY_FONT}`;
+  for (const line of jokeLines) {
+    y += 54;
+    g.fillText(line, left, y);
+  }
+  g.globalAlpha = 1;
+
+  // Four stat tiles, each in one of the site's colors
+  const tiles = [
+    { label: "Top career", value: r.best.field, bg: C.butter },
+    { label: "Hard no", value: r.worst.field, bg: C.bubble },
+    { label: "Smiling", value: `${r.smilePct}%`, bg: C.mint },
+    { label: "Expressiveness", value: `${r.score}/100`, bg: C.milk },
+  ];
+  const tileW = 435;
+  const tileH = 190;
+  tiles.forEach((t, i) => {
+    const x = left + (i % 2) * (tileW + 30);
+    const ty = 1200 + Math.floor(i / 2) * (tileH + 25);
+    roundedRect(g, x, ty, tileW, tileH, 36);
+    g.fillStyle = t.bg;
+    g.fill();
+
+    g.fillStyle = C.ink;
+    g.font = `500 32px ${STORY_FONT}`;
+    g.fillText(t.label, x + 34, ty + 62);
+
+    let valueSize = 68;
+    g.font = `800 ${valueSize}px ${STORY_FONT}`;
+    while (g.measureText(t.value).width > tileW - 68 && valueSize > 34) {
+      valueSize -= 4;
+      g.font = `800 ${valueSize}px ${STORY_FONT}`;
+    }
+    g.fillText(t.value, x + 34, ty + 150);
+  });
+
+  // Footer with the link
+  g.fillStyle = C.milk;
+  g.globalAlpha = 0.8;
+  g.font = `500 34px ${STORY_FONT}`;
+  g.fillText("Find your dream job at", left, 1712);
+  g.globalAlpha = 1;
+  g.font = `800 38px ${STORY_FONT}`;
+  g.fillText(SITE_URL.replace(/^https?:\/\//, "").replace(/\/$/, ""), left, 1762);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  const file = new File([blob], "face-wrapped-story.png", { type: "image/png" });
+  return { file, url: URL.createObjectURL(blob) };
 }
