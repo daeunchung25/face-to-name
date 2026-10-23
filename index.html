@@ -7,7 +7,7 @@
   <meta name="description" content="Answer six ridiculous questions out loud and get your face wrapped.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -21,7 +21,12 @@
           and wrap up everything it did. Accuracy: questionable.
         </p>
         <button id="startBtn" class="btn">Start my session</button>
-        <p class="fine">Everything runs in your browser. Your camera feed is never recorded or uploaded.</p>
+        <div class="badges" aria-label="Credentials">
+          <span>Powered by Eyebrow Intelligence™</span>
+          <span>Peer reviewed by nobody</span>
+          <span>0 scientists agree</span>
+        </div>
+        <p class="fine">Everything runs in your browser. Your camera feed is never recorded or uploaded. Your eyebrows, however, will be judged.</p>
         <p id="introStatus" class="status" role="status" aria-live="polite"></p>
       </div>
 
@@ -44,6 +49,7 @@
       <div class="stage">
         <video id="video" playsinline muted></video>
         <canvas id="overlay"></canvas>
+        <span class="scan-badge" aria-hidden="true">Analyzing (vibes)</span>
         <p id="noFace" class="noface hidden">Move into the frame so your whole face is visible.</p>
       </div>
 
@@ -54,15 +60,17 @@
         <button id="nextBtn" class="btn hidden">I'm finished</button>
 
         <div class="meters" aria-hidden="true">
-          <span class="meter-label">Eyebrows</span>
+          <span class="meter-label">Eyebrow activity</span>
           <div class="meter"><span id="m-brows" class="c-brows"></span></div>
-          <span class="meter-label">Eyes</span>
+          <span class="meter-label">Eye drama</span>
           <div class="meter"><span id="m-eyes" class="c-eyes"></span></div>
-          <span class="meter-label">Smile</span>
+          <span class="meter-label">Smile sincerity</span>
           <div class="meter"><span id="m-smile" class="c-lips"></span></div>
-          <span class="meter-label">Jaw</span>
+          <span class="meter-label">Jaw (ignored)</span>
           <div class="meter"><span id="m-jaw" class="c-jaw"></span></div>
         </div>
+        <p id="analysisLine" class="analysis" aria-hidden="true">Warming up the eyebrow sensors…</p>
+        <p class="confidence" aria-hidden="true">AI confidence: <b id="fakeConf">99.97%</b></p>
       </div>
     </section>
 
