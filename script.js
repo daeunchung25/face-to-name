@@ -17,6 +17,9 @@
       a joke award that admits it's scientifically questionable.
    5. The last card draws a 1080×1920 image for an Instagram story and
       lets you share the site with friends.
+   6. The design is satire: every result looks like official paperwork,
+      with case numbers, rubber stamps, fine print, and wildly precise
+      "AI confidence" numbers that mean nothing.
    ========================================================= */
 
 import {
@@ -136,6 +139,21 @@ const DECO = {
   flat:  `<svg viewBox="0 0 300 160"><path d="M40 90 L260 90"/></svg>`,
 };
 
+// Fake "analysis" messages shown while you answer
+const ANALYSIS_LINES = [
+  "Measuring eyebrow altitude…",
+  "Consulting the eyebrow council…",
+  "Cross-referencing with your horoscope…",
+  "Detecting sarcasm (allegedly)…",
+  "Ignoring everything you actually said…",
+  "Comparing you to a golden retriever…",
+  "Calculating vibes to 12 decimal places…",
+  "Rounding up for dramatic effect…",
+];
+
+// Random, meaningless, very precise confidence numbers
+const fakeConfidence = (min = 97) => (min + Math.random() * (99.99 - min)).toFixed(2);
+
 /* ---------------- DOM ---------------- */
 
 const $ = (id) => document.getElementById(id);
@@ -169,6 +187,8 @@ let storyUrl = null;    // the same image as a temporary URL (for preview and do
 let state = null;
 let lastVideoTime = -1;
 let lastProcessed = 0;
+let hudChangedAt = 0;
+let hudIndex = 0;
 
 /* ---------------- Screens ---------------- */
 
@@ -339,6 +359,7 @@ function loop(now) {
   }
 
   updateClock(now);
+  updateHud(now);
   requestAnimationFrame(loop);
 }
 
@@ -355,6 +376,14 @@ function updateClock(now) {
       beginPhase("session");
     }
   }
+}
+
+// Rotates the fake analysis message and confidence number every few seconds
+function updateHud(now) {
+  if (now - hudChangedAt < 2600) return;
+  hudChangedAt = now;
+  $("analysisLine").textContent = ANALYSIS_LINES[hudIndex++ % ANALYSIS_LINES.length];
+  $("fakeConf").textContent = `${fakeConfidence(99)}%`;
 }
 
 function handleResult(result, dt) {
@@ -630,6 +659,7 @@ function buildResults() {
   const score = Math.round(100 * Math.min(1, Math.sqrt(meanIntensity / T.fullScoreIntensity)));
 
   const r = {
+    caseNo: `FW-${Math.floor(1000 + Math.random() * 9000)}`,
     frames,
     smilePct: pctOf(state.smileFrames, frames),
     genuinePct: pctOf(state.genuineFrames, state.smileFrames),
@@ -744,33 +774,42 @@ function buildCards(r) {
   return [
     {
       bg: P.cobalt, fg: P.milk, deco: DECO.face,
+      exhibit: "Intake", stamp: "Received",
+      fine: "*Sample size: one (1) face. Margin of error: also one face.",
       html: `<p class="kicker">You answered</p>
         <p class="big">${count(QUESTIONS.length, "questions")}</p>
-        <p class="body">All of them ridiculous. Your face reacted to every one, and we took notes.</p>
-        <p class="tap-hint">Tap or swipe to continue</p>`,
+        <p class="body">All of them ridiculous. Your face reacted to every one, and our algorithm took extremely serious notes.</p>
+        <p class="tap-hint">Tap or swipe to review the evidence</p>`,
     },
     {
       bg: P.butter, fg: P.ink, deco: DECO.smile,
+      exhibit: "Exhibit A", stamp: "Verified*",
+      fine: "*Verified by the same algorithm that made the claim.",
       html: `<p class="kicker">You smiled for</p>
         <p class="big">${count(r.smilePct, "%")}</p>
         <p class="body">of the session. ${smileBody}</p>`,
     },
     {
       bg: P.mint, fg: P.ink, deco: DECO.smile,
+      exhibit: "Exhibit B", stamp: "Under review",
+      fine: "*Method: real laughs crinkle your eyes, polite ones don’t, sarcastic ones are lopsided or come with an eye roll. Also a strong hunch.",
       html: `<p class="kicker">The laugh audit</p>
         <p class="big">${count(totalLaughs, totalLaughs === 1 ? "smile" : "smiles")}</p>
         ${bars(laughRows)}
-        <p class="body">${laughQuip}</p>
-        <p class="tap-hint">How we tell: real laughs crinkle your eyes. Polite ones don’t. Sarcastic ones are lopsided or come with an eye roll.</p>`,
+        <p class="body">${laughQuip}</p>`,
     },
     {
       bg: P.bubble, fg: P.ink, deco: DECO.brows,
+      exhibit: "Exhibit C", stamp: "Suspicious",
+      fine: "*Eyebrows are not admissible as evidence in most courts.",
       html: `<p class="kicker">You raised your eyebrows</p>
         <p class="big">${count(ev.browRaise, ev.browRaise === 1 ? "time" : "times")}</p>
         <p class="body">${browBody}</p>`,
     },
     {
       bg: P.lilac, fg: P.ink, deco: featureDeco(r.topRegion),
+      exhibit: "Exhibit D", stamp: "Confirmed (probably)",
+      fine: "*Your other facial features have been notified.",
       html: `<p class="kicker">Your most expressive feature</p>
         <p class="big words">${REGIONS[r.topRegion].label}</p>
         ${bars(regionRows)}
@@ -778,26 +817,35 @@ function buildCards(r) {
     },
     {
       bg: P.lime, fg: P.ink, deco: DECO.smile,
+      exhibit: "Exhibit E", stamp: "Hilarious (to you)",
+      fine: "*No one else was consulted.",
       html: `<p class="kicker">${funnyKicker}</p>
         <p class="big quote">“${r.funniest.prompt}”</p>
         <p class="body">${funnyBody}</p>`,
     },
     {
       bg: P.forest, fg: P.milk, deco: DECO.flat,
+      exhibit: "Exhibit F", stamp: "Redacted",
+      fine: "*We tried. Your face did not cooperate with the investigation.",
       html: `<p class="kicker">You kept a perfectly straight face during</p>
         <p class="big quote">“${r.calmest.prompt}”</p>
-        <p class="body">Either you meant every word, or you’re hiding something. We’ll never know.</p>`,
+        <p class="body">Either you meant every word, or you’re <span class="redact">hiding</span> something. We’ll never know.</p>`,
     },
     {
       bg: P.sky, fg: P.ink, deco: DECO.eye,
+      exhibit: "Exhibit G", stamp: "Very scientific",
+      fine: "*It isn’t. Moods were assigned, not asked about.",
       html: `<p class="kicker">Your expression mix</p>
         <p class="big words">Mostly ${emotionRows[0].label.toLowerCase()}</p>
         ${bars(emotionRows)}
-        <p class="body">Every frame of your face, sorted into five moods. Very scientific. (It isn’t.)</p>`,
+        <p class="body">Every single frame of your face, sorted into five moods with total confidence.</p>`,
     },
     {
-      bg: r.award.bg, fg: P.milk, deco: DECO.face,
-      html: `<p class="kicker">Your face’s official title</p>
+      bg: r.award.bg, fg: P.milk, deco: "", certificate: true,
+      exhibit: "Final ruling", stamp: "Official-ish",
+      fine: "*Not valid for employment, dating, or court. Please don’t put it on your résumé.",
+      html: `<p class="kicker">Certificate of Facial Achievement</p>
+        <p class="body">This certifies that your face is officially</p>
         <p class="big words">${r.award.name}</p>
         <p class="body">${r.award.desc}</p>
         <dl class="summary">
@@ -806,11 +854,13 @@ function buildCards(r) {
           <div><dt>Top feature</dt><dd>${REGIONS[r.topRegion].short}</dd></div>
           <div><dt>Expressiveness</dt><dd>${r.score}/100</dd></div>
         </dl>
-        <p class="tap-hint">Based entirely on your eyebrows. Please don’t put it on your résumé.</p>`,
+        <p class="signature"><span class="sig">Dr. A. Lgorithm</span>Chief Eyebrow Analyst (not a real doctor)</p>`,
     },
     {
       bg: P.tangerine, fg: P.ink, deco: "",
-      html: `<p class="kicker">Take it with you</p>
+      exhibit: "Release form",
+      fine: "*By sharing, you agree that your eyebrows are now public figures.",
+      html: `<p class="kicker">Take the evidence with you</p>
         <img id="storyPreview" class="share-preview" alt="">
         <div class="share-actions">
           <button class="btn btn-dark" data-action="save">Save for your story</button>
@@ -833,9 +883,17 @@ function renderCards(results) {
   const cards = $("cards");
   cards.innerHTML = cardData
     .map(
-      (c, i) => `<article class="card" style="--bg:${c.bg};--fg:${c.fg}"
+      (c, i) => `<article class="card${c.certificate ? " certificate" : ""}" style="--bg:${c.bg};--fg:${c.fg}"
         aria-roledescription="slide" aria-label="${i + 1} of ${cardData.length}">
-        <div class="deco" aria-hidden="true">${c.deco}</div>${c.html}</article>`
+        <div class="deco" aria-hidden="true">${c.deco}</div>
+        <div class="card-head" aria-hidden="true">
+          <span>File ${results.caseNo} / ${c.exhibit}</span>
+          <span>AI confidence ${fakeConfidence()}%</span>
+        </div>
+        ${c.stamp ? `<span class="stamp" aria-hidden="true">${c.stamp}</span>` : ""}
+        ${c.html}
+        ${c.fine ? `<p class="fineprint">${c.fine}</p>` : ""}
+      </article>`
     )
     .join("");
   $("progress").innerHTML = cardData.map(() => "<i></i>").join("");
@@ -1002,11 +1060,12 @@ function roundedRect(g, x, y, w, h, r) {
 }
 
 async function makeStoryImage(r) {
-  // Make sure the font is loaded before drawing text on the canvas
+  // Make sure the fonts are loaded before drawing text on the canvas
   try {
-    await Promise.all(
-      [400, 500, 800].map((w) => document.fonts.load(`${w} 100px "Bricolage Grotesque"`))
-    );
+    await Promise.all([
+      ...[400, 500, 800].map((w) => document.fonts.load(`${w} 100px "Bricolage Grotesque"`)),
+      document.fonts.load(`500 30px "DM Mono"`),
+    ]);
   } catch (err) {
     console.warn("Font didn't load, using fallback.", err);
   }
@@ -1020,20 +1079,37 @@ async function makeStoryImage(r) {
   const left = 90;
   const textWidth = STORY_W - left * 2;
 
+  const MONO = '"DM Mono", ui-monospace, monospace';
+
   // Background: each award has its own color
   g.fillStyle = r.award.bg;
   g.fillRect(0, 0, STORY_W, STORY_H);
 
-  // Wordmark
+  // Certificate border (two thin lines)
+  g.strokeStyle = C.milk;
+  g.globalAlpha = 0.5;
+  g.lineWidth = 4;
+  g.strokeRect(44, 44, STORY_W - 88, STORY_H - 88);
+  g.lineWidth = 2;
+  g.strokeRect(62, 62, STORY_W - 124, STORY_H - 124);
+  g.globalAlpha = 1;
+
+  // Header: wordmark + case number
   g.textBaseline = "alphabetic";
   g.fillStyle = C.milk;
-  g.font = `800 52px ${STORY_FONT}`;
-  g.fillText("Face Wrapped", left, 190);
+  g.font = `800 48px ${STORY_FONT}`;
+  g.fillText("Face Wrapped", left, 170);
+  g.font = `500 28px ${MONO}`;
+  g.globalAlpha = 0.8;
+  g.textAlign = "right";
+  g.fillText(`File ${r.caseNo}`, STORY_W - left, 166);
+  g.textAlign = "left";
+  g.globalAlpha = 1;
 
   // The floating face: pink brows, mint eyes, yellow smile (same as the site)
   g.save();
-  g.translate(285, 200);
-  g.scale(1.7, 1.7);
+  g.translate(315, 190);
+  g.scale(1.5, 1.5);
   g.lineCap = "round";
   g.lineWidth = 16;
   g.strokeStyle = C.bubble;
@@ -1049,40 +1125,59 @@ async function makeStoryImage(r) {
   g.stroke(new Path2D("M85 205 Q150 258 215 205"));
   g.restore();
 
-  // Kicker + the award name, sized to fit
-  let y = 760;
+  // Rubber stamp, tilted
+  g.save();
+  g.translate(830, 540);
+  g.rotate(-0.2);
+  g.strokeStyle = C.butter;
+  g.fillStyle = C.butter;
+  g.lineWidth = 6;
+  roundedRect(g, -150, -50, 300, 100, 14);
+  g.stroke();
+  g.font = `500 40px ${MONO}`;
+  g.textAlign = "center";
+  g.fillText("OFFICIAL-ISH", 0, 14);
+  g.restore();
+  g.textAlign = "left";
+
+  // Certificate text + the award name, sized to fit
+  let y = 680;
   g.fillStyle = C.milk;
-  g.globalAlpha = 0.85;
-  g.font = `500 42px ${STORY_FONT}`;
-  g.fillText("My face’s official title:", left, y);
+  g.globalAlpha = 0.8;
+  g.font = `500 30px ${MONO}`;
+  g.fillText("CERTIFICATE OF FACIAL ACHIEVEMENT", left, y);
+  y += 56;
+  g.globalAlpha = 0.9;
+  g.font = `500 40px ${STORY_FONT}`;
+  g.fillText("This certifies that my face is officially", left, y);
   g.globalAlpha = 1;
 
-  g.font = `400 40px ${STORY_FONT}`;
+  g.font = `400 38px ${STORY_FONT}`;
   const descLines = wrapLines(g, r.award.desc, textWidth);
-  const descHeight = descLines.length * 54;
+  const descHeight = descLines.length * 50;
 
-  const textBottom = 1150;
-  let size = 150;
+  const textBottom = 1100;
+  let size = 140;
   let nameLines;
-  for (; size >= 64; size -= 6) {
+  for (; size >= 60; size -= 6) {
     g.font = `800 ${size}px ${STORY_FONT}`;
     nameLines = wrapLines(g, r.award.name, textWidth);
     const nameHeight = nameLines.length * size * 0.95;
-    if (y + 24 + nameHeight + 36 + descHeight <= textBottom) break;
+    if (y + 16 + nameHeight + 30 + descHeight <= textBottom) break;
   }
 
-  y += 24;
+  y += 16;
   g.font = `800 ${size}px ${STORY_FONT}`;
   for (const line of nameLines) {
     y += size * 0.95;
     g.fillText(line, left, y);
   }
 
-  y += 36;
+  y += 30;
   g.globalAlpha = 0.9;
-  g.font = `400 40px ${STORY_FONT}`;
+  g.font = `400 38px ${STORY_FONT}`;
   for (const line of descLines) {
-    y += 54;
+    y += 50;
     g.fillText(line, left, y);
   }
   g.globalAlpha = 1;
@@ -1095,37 +1190,41 @@ async function makeStoryImage(r) {
     { label: "Expressiveness", value: `${r.score}/100`, bg: C.lime },
   ];
   const tileW = 435;
-  const tileH = 190;
+  const tileH = 180;
   tiles.forEach((t, i) => {
     const x = left + (i % 2) * (tileW + 30);
-    const ty = 1200 + Math.floor(i / 2) * (tileH + 25);
-    roundedRect(g, x, ty, tileW, tileH, 36);
+    const ty = 1140 + Math.floor(i / 2) * (tileH + 22);
+    roundedRect(g, x, ty, tileW, tileH, 30);
     g.fillStyle = t.bg;
     g.fill();
 
     g.fillStyle = C.ink;
-    g.font = `500 32px ${STORY_FONT}`;
-    g.fillText(t.label, x + 34, ty + 62);
+    g.font = `500 28px ${MONO}`;
+    g.fillText(t.label, x + 32, ty + 58);
 
-    let valueSize = 68;
+    let valueSize = 64;
     g.font = `800 ${valueSize}px ${STORY_FONT}`;
-    while (g.measureText(t.value).width > tileW - 68 && valueSize > 34) {
+    while (g.measureText(t.value).width > tileW - 64 && valueSize > 34) {
       valueSize -= 4;
       g.font = `800 ${valueSize}px ${STORY_FONT}`;
     }
-    g.fillText(t.value, x + 34, ty + 150);
+    g.fillText(t.value, x + 32, ty + 142);
   });
 
-  // The honest disclaimer, then the link
+  // Signature line
   g.fillStyle = C.milk;
-  g.globalAlpha = 0.75;
-  g.font = `500 34px ${STORY_FONT}`;
-  g.fillText("Accuracy: questionable. Confidence: 100%.", left, 1670);
-  g.font = `500 34px ${STORY_FONT}`;
-  g.fillText("Get your own title at", left, 1740);
+  g.font = `italic 56px "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive`;
+  g.fillText("Dr. A. Lgorithm", left, 1610);
+  g.fillRect(left, 1626, 480, 3);
+  g.globalAlpha = 0.8;
+  g.font = `500 26px ${MONO}`;
+  g.fillText("Chief Eyebrow Analyst (not a real doctor)", left, 1666);
+
+  // Fine print + link
+  g.fillText(`AI confidence: ${fakeConfidence(99)}%. Actual accuracy: unknown.`, left, 1730);
   g.globalAlpha = 1;
-  g.font = `800 38px ${STORY_FONT}`;
-  g.fillText(SITE_URL.replace(/^https?:\/\//, "").replace(/\/$/, ""), left, 1790);
+  g.font = `800 34px ${STORY_FONT}`;
+  g.fillText(`Get yours: ${SITE_URL.replace(/^https?:\/\//, "").replace(/\/$/, "")}`, left, 1786);
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
   const file = new File([blob], "face-wrapped-story.png", { type: "image/png" });
