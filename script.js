@@ -142,18 +142,6 @@ const DECO = {
   flat:  `<svg viewBox="0 0 300 160"><path d="M40 90 L260 90"/></svg>`,
 };
 
-// Fake "analysis" messages shown while you answer
-const ANALYSIS_LINES = [
-  "Measuring eyebrow altitude…",
-  "Consulting the eyebrow council…",
-  "Cross-referencing with your horoscope…",
-  "Detecting sarcasm (allegedly)…",
-  "Ignoring everything you actually said…",
-  "Comparing you to a golden retriever…",
-  "Calculating vibes to 12 decimal places…",
-  "Rounding up for dramatic effect…",
-];
-
 /* ---------------- DOM ---------------- */
 
 const $ = (id) => document.getElementById(id);
@@ -171,8 +159,6 @@ let storyUrl = null;    // the same image as a temporary URL (for preview and do
 let state = null;
 let lastVideoTime = -1;
 let lastProcessed = 0;
-let hudChangedAt = 0;
-let hudIndex = 0;
 
 /* ---------------- Screens ---------------- */
 
@@ -342,7 +328,6 @@ function loop(now) {
   }
 
   updateClock(now);
-  updateHud(now);
   requestAnimationFrame(loop);
 }
 
@@ -359,13 +344,6 @@ function updateClock(now) {
       beginPhase("session");
     }
   }
-}
-
-// Rotates the fake analysis message every few seconds
-function updateHud(now) {
-  if (now - hudChangedAt < 2600) return;
-  hudChangedAt = now;
-  $("analysisLine").textContent = ANALYSIS_LINES[hudIndex++ % ANALYSIS_LINES.length];
 }
 
 function handleResult(result, dt) {
