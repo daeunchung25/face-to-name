@@ -86,11 +86,11 @@ const REGIONS = {
 };
 
 const REGION_QUIPS = {
-  leftBrow:  "Your eyebrow has more range than most actors.",
-  rightBrow: "Your eyebrow has more range than most actors.",
-  leftEye:   "Your eyes said things your mouth was too polite to say.",
-  rightEye:  "Your eyes said things your mouth was too polite to say.",
-  mouth:     "Your mouth did all the work. The rest of your face just watched.",
+  leftBrow:  "More range than most actors.",
+  rightBrow: "More range than most actors.",
+  leftEye:   "Your eyes did the talking.",
+  rightEye:  "Your eyes did the talking.",
+  mouth:     "Your mouth did all the work.",
 };
 
 // The five "moods" every frame gets sorted into
@@ -105,23 +105,23 @@ const EMOTIONS = {
 // The joke award at the end. bg = its color on the card and the story image.
 const AWARDS = {
   laugh:   { name: "The Human Laugh Track",       bg: "#4a1a6b",
-             desc: "You laughed at your own answers. Every single time. Iconic behavior." },
+             desc: "You laughed at your own answers. Every time." },
   shock:   { name: "Chief Shock Officer",         bg: "#2233ff",
-             desc: "Everything surprised you, including answers you came up with yourself." },
+             desc: "Everything surprised you. Even your own answers." },
   sideeye: { name: "The Professional Side-Eyer",  bg: "#0e5c45",
-             desc: "One eyebrow up, zero trust given. Your face fact-checks everything." },
+             desc: "One eyebrow up. Zero trust." },
   thinker: { name: "The Overthinker in Residence", bg: "#1a1033",
-             desc: "Furrowed brow, deep thoughts. Even about pineapple pizza." },
+             desc: "Deep thoughts. Even about pizza." },
   poker:   { name: "Certified Poker Face",        bg: "#262626",
-             desc: "All those ridiculous questions and your face gave away nothing. Are you okay?" },
+             desc: "Your face gave away nothing. Are you okay?" },
   gif:     { name: "The Walking Reaction GIF",    bg: "#00546b",
-             desc: "Your face doesn’t do subtle. Every feeling, in high definition." },
+             desc: "Your face doesn’t do subtle." },
   brows:   { name: "Chief Eyebrow Officer",       bg: "#8a1c4a",
-             desc: "Your eyebrows did more talking than you did." },
+             desc: "Your eyebrows did the talking." },
   polite:  { name: "The Customer Service Smile",  bg: "#8a3b12",
-             desc: "Lots of smiles, very few of them real. Have a nice day!" },
+             desc: "Lots of smiles. Few real ones." },
   sarcasm: { name: "Head of the Sarcasm Department", bg: "#3b3b98",
-             desc: "Your smiles were lopsided, your eyes were rolling. We felt that." },
+             desc: "Lopsided smiles. Rolling eyes." },
 };
 const EMOTION_AWARD = { joy: "laugh", surprise: "shock", skeptic: "sideeye", focus: "thinker" };
 
@@ -270,9 +270,9 @@ $("startBtn").addEventListener("click", async () => {
   const btn = $("startBtn");
   btn.disabled = true;
   try {
-    setStatus("Loading the face model. This takes a few seconds the first time.");
+    setStatus("Loading…");
     await loadModel();
-    setStatus("Waiting for camera permission.");
+    setStatus("Allow the camera to start.");
     await startCamera();
     setStatus("");
     resetState();
@@ -283,9 +283,9 @@ $("startBtn").addEventListener("click", async () => {
     console.error(err);
     stopCamera();
     if (err && err.name === "NotAllowedError") {
-      setStatus("Camera access is blocked. Allow the camera from your browser's address bar, then press Start again.");
+      setStatus("Camera blocked. Allow it in your browser, then try again.");
     } else if (err && err.name === "NotFoundError") {
-      setStatus("No camera was found. Connect a webcam and press Start again.");
+      setStatus("No camera found.");
     } else {
       setStatus(`The session couldn't start: ${err && err.message ? err.message : err}`);
     }
@@ -295,7 +295,7 @@ $("startBtn").addEventListener("click", async () => {
 });
 
 function showQuestion(i) {
-  $("phaseLabel").textContent = `Question ${i + 1} of ${QUESTIONS.length}. Answer out loud, as long as you like.`;
+  $("phaseLabel").textContent = `Question ${i + 1} of ${QUESTIONS.length}`;
   $("prompt").textContent = QUESTIONS[i].prompt;
   // The progress bar shows how many questions are done
   $("timerBar").style.width = `${(i / QUESTIONS.length) * 100}%`;
@@ -316,8 +316,8 @@ function beginPhase(phase) {
   state.phase = phase;
   state.phaseStart = performance.now();
   if (phase === "calibrating") {
-    $("phaseLabel").textContent = "Getting your resting face";
-    $("prompt").textContent = "Relax your face and look at the camera. The questions start in a moment.";
+    $("phaseLabel").textContent = "Getting ready";
+    $("prompt").textContent = "Relax and look at the camera.";
     $("nextBtn").classList.add("hidden");
   } else if (phase === "session") {
     state.questionIndex = 0;
@@ -594,7 +594,7 @@ function finish() {
 
   if (state.faceFrames < 60) {
     showScreen("intro");
-    setStatus("Your face was only visible for a moment. Sit facing the camera in good light and press Start again.");
+    setStatus("Couldn’t see your face. Try again in better light.");
     return;
   }
   const results = buildResults();
@@ -695,8 +695,6 @@ function pickAward(r) {
 const count = (n, unit = "") =>
   `<span class="count" data-to="${n}">${REDUCED_MOTION ? n : 0}</span>${unit ? `<span class="unit">${unit}</span>` : ""}`;
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
 function bars(rows) {
   const min = Math.min(...rows.map((r) => r.value));
   const shifted = rows.map((r) => ({ ...r, value: r.value - Math.min(0, min) + 0.02 }));
@@ -721,29 +719,11 @@ function buildCards(r) {
   const P = PALETTE;
 
   // Smile card copy
-  let smileBody;
-  if (r.smileFrames === 0) smileBody = "Not a single smile registered. Tough crowd.";
-  else {
-    let quip = "A healthy mix of real smiles and polite ones.";
-    if (r.smilePct < 5) quip = "Smiles were rare, so every one of them counted.";
-    else if (r.genuinePct >= 60) quip = "Most of those were the real thing, eyes and all.";
-    else if (r.genuinePct < 30) quip = "The rest were polite. We noticed.";
-    smileBody = `${r.genuinePct}% of those smiles reached your eyes. ${quip}`;
-  }
+  const smileBody = r.smileFrames === 0 ? "Not once. Tough crowd." : `${r.genuinePct}% of them were real.`;
 
   // Eyebrow card copy
-  let browBody = `You furrowed them ${plural(ev.furrow, "time")}, too.`;
-  if (r.mostBrows && r.mostBrows.browRaises > 0) {
-    browBody = `Most of them went up during the ${r.mostBrows.short} question. ${browBody}`;
-  }
-  if (ev.oneBrow > 0) browBody += ` And ${plural(ev.oneBrow, "time")} you raised just one. Iconic.`;
-
-  // Funniest question copy
-  const laughed = r.funniest.joyPct > 0;
-  const funnyKicker = laughed ? "You cracked yourself up during" : "Your face got busiest during";
-  const funnyBody = laughed
-    ? `You were smiling ${r.funniest.joyPct}% of the time you answered this one. Comedy is subjective, but you’re clearly a fan.`
-    : "Not one smile, but your face was working overtime.";
+  const browBody =
+    r.mostBrows && r.mostBrows.browRaises > 0 ? `Mostly during the ${r.mostBrows.short} question.` : "";
 
   // Laugh audit copy
   const L = r.laughs;
@@ -753,12 +733,12 @@ function buildCards(r) {
     { label: "Polite", value: L.polite, display: String(L.polite) },
     { label: "Sarcastic", value: L.sarcastic, display: String(L.sarcastic) },
   ];
-  let laughQuip = "No smiles detected at all. Tough crowd.";
+  let laughQuip = "No smiles. Tough crowd.";
   if (totalLaughs > 0) {
     const most = laughRows.reduce((a, b) => (b.value > a.value ? b : a));
-    if (most.label === "Sarcastic") laughQuip = "More sarcasm than actual laughing. We’re not mad, just impressed.";
-    else if (most.label === "Polite") laughQuip = "Mostly polite smiles. Very professional of you.";
-    else laughQuip = "Mostly the real thing: cheeks up, eyes crinkled, no faking.";
+    if (most.label === "Sarcastic") laughQuip = "Mostly sarcasm. Impressive.";
+    else if (most.label === "Polite") laughQuip = "Mostly polite. Very professional.";
+    else laughQuip = "Mostly the real thing.";
   }
 
   const regionRows = Object.keys(REGIONS)
@@ -773,24 +753,21 @@ function buildCards(r) {
     {
       bg: P.cobalt, fg: P.milk, deco: DECO.face,
       exhibit: "Intake", stamp: "Received",
-      fine: "*Sample size: one (1) face. Margin of error: also one face.",
       html: `<p class="kicker">You answered</p>
         <p class="big">${count(QUESTIONS.length, "questions")}</p>
-        <p class="body">All of them ridiculous. Your face reacted to every one, and our algorithm took extremely serious notes.</p>
-        <p class="tap-hint">Tap or swipe to review the evidence</p>`,
+        <p class="body">Your face had thoughts.</p>
+        <p class="tap-hint">Tap to continue</p>`,
     },
     {
       bg: P.butter, fg: P.ink, deco: DECO.smile,
       exhibit: "Exhibit A", stamp: "Verified*",
-      fine: "*Verified by the same algorithm that made the claim.",
       html: `<p class="kicker">You smiled for</p>
         <p class="big">${count(r.smilePct, "%")}</p>
-        <p class="body">of the session. ${smileBody}</p>`,
+        <p class="body">${smileBody}</p>`,
     },
     {
       bg: P.mint, fg: P.ink, deco: DECO.smile,
       exhibit: "Exhibit B", stamp: "Under review",
-      fine: "*Method: real laughs crinkle your eyes, polite ones don’t, sarcastic ones are lopsided or come with an eye roll. Also a strong hunch.",
       html: `<p class="kicker">The laugh audit</p>
         <p class="big">${count(totalLaughs, totalLaughs === 1 ? "smile" : "smiles")}</p>
         ${bars(laughRows)}
@@ -799,15 +776,13 @@ function buildCards(r) {
     {
       bg: P.bubble, fg: P.ink, deco: DECO.brows,
       exhibit: "Exhibit C", stamp: "Suspicious",
-      fine: "*Eyebrows are not admissible as evidence in most courts.",
       html: `<p class="kicker">You raised your eyebrows</p>
         <p class="big">${count(ev.browRaise, ev.browRaise === 1 ? "time" : "times")}</p>
-        <p class="body">${browBody}</p>`,
+        ${browBody ? `<p class="body">${browBody}</p>` : ""}`,
     },
     {
       bg: P.lilac, fg: P.ink, deco: featureDeco(r.topRegion),
       exhibit: "Exhibit D", stamp: "Confirmed (probably)",
-      fine: "*Your other facial features have been notified.",
       html: `<p class="kicker">Your most expressive feature</p>
         <p class="big words">${REGIONS[r.topRegion].label}</p>
         ${bars(regionRows)}
@@ -816,34 +791,27 @@ function buildCards(r) {
     {
       bg: P.lime, fg: P.ink, deco: DECO.smile,
       exhibit: "Exhibit E", stamp: "Hilarious (to you)",
-      fine: "*No one else was consulted.",
-      html: `<p class="kicker">${funnyKicker}</p>
-        <p class="big quote">“${r.funniest.prompt}”</p>
-        <p class="body">${funnyBody}</p>`,
+      html: `<p class="kicker">You cracked up during</p>
+        <p class="big quote">“${r.funniest.prompt}”</p>`,
     },
     {
       bg: P.forest, fg: P.milk, deco: DECO.flat,
       exhibit: "Exhibit F", stamp: "Redacted",
-      fine: "*We tried. Your face did not cooperate with the investigation.",
-      html: `<p class="kicker">You kept a perfectly straight face during</p>
+      html: `<p class="kicker">Straight face during</p>
         <p class="big quote">“${r.calmest.prompt}”</p>
-        <p class="body">Either you meant every word, or you’re <span class="redact">hiding</span> something. We’ll never know.</p>`,
+        <p class="body">Either honest, or <span class="redact">hiding</span> something.</p>`,
     },
     {
       bg: P.sky, fg: P.ink, deco: DECO.eye,
       exhibit: "Exhibit G", stamp: "Very scientific",
-      fine: "*It isn’t. Moods were assigned, not asked about.",
       html: `<p class="kicker">Your expression mix</p>
         <p class="big words">Mostly ${emotionRows[0].label.toLowerCase()}</p>
-        ${bars(emotionRows)}
-        <p class="body">Every single frame of your face, sorted into five moods with total confidence.</p>`,
+        ${bars(emotionRows)}`,
     },
     {
       bg: r.award.bg, fg: P.milk, deco: "", certificate: true,
       exhibit: "Final ruling", stamp: "Official-ish",
-      fine: "*Not valid for employment, dating, or court. Please don’t put it on your résumé.",
-      html: `<p class="kicker">Certificate of Facial Achievement</p>
-        <p class="body">This certifies that your face is officially</p>
+      html: `<p class="kicker">Your face’s official title</p>
         <p class="big words">${r.award.name}</p>
         <p class="body">${r.award.desc}</p>
         <dl class="summary">
@@ -852,35 +820,30 @@ function buildCards(r) {
           <div><dt>Top feature</dt><dd>${REGIONS[r.topRegion].short}</dd></div>
           <div><dt>Expressiveness</dt><dd>${r.score}/100</dd></div>
         </dl>
-        <p class="signature"><span class="sig">Dr. A. Lgorithm</span>Chief Eyebrow Analyst (not a real doctor)</p>`,
+        <p class="signature"><span class="sig">Dr. A. Lgorithm</span>Not a real doctor</p>`,
     },
     {
       bg: "#0d0d0d", fg: P.milk, deco: "", plain: true,
-      html: `<p class="kicker">One more thing.</p>
-        <p class="reveal-line">You’ve never actually seen yourself laugh.</p>
-        <p class="body">You know your face from mirrors and posed selfies. Everyone else knows it from moments like the ones you just had.</p>
-        <p class="tap-hint">Tap to see</p>`,
+      html: `<p class="reveal-line">Just in case you haven’t smiled today…</p>
+        <p class="tap-hint">Tap</p>`,
     },
     {
       bg: P.milk, fg: P.ink, deco: "", plain: true,
       html: r.photos.length
-        ? `<p class="kicker">This is you, laughing.</p>
+        ? `<p class="kicker">…you did.</p>
           <div class="gallery${r.photos.length === 1 ? " one" : ""}">
             ${r.photos
               .map((p) => `<figure><img src="${p.src}" alt="You laughing during the ${p.short} question"><figcaption>${p.short}</figcaption></figure>`)
               .join("")}
           </div>
-          <p class="body">Not mirrored. This is the face everyone else sees. The algorithm had to guess. Your friends never did. They’ve been watching you laugh this whole time.</p>
-          <p class="gallery-note">These photos stay on your device and disappear when you close the page.</p>`
-        : `<p class="kicker">This is you, laughing.</p>
-          <p class="reveal-line">We didn’t catch a single laugh.</p>
-          <p class="body">Maybe the questions weren’t funny. Or maybe you were holding it in. Run it again, and this time, let it out.</p>`,
+          <p class="gallery-note">Only on your device.</p>`
+        : `<p class="reveal-line">We didn’t catch one.</p>
+          <p class="body">Run it again and let it out.</p>`,
     },
     {
       bg: P.tangerine, fg: P.ink, deco: "",
       exhibit: "Release form",
-      fine: "*By sharing, you agree that your eyebrows are now public figures.",
-      html: `<p class="kicker">Take the evidence with you</p>
+      html: `<p class="kicker">Take it with you</p>
         <img id="storyPreview" class="share-preview" alt="">
         <div class="share-actions">
           <button class="btn btn-dark" data-action="save">Save for your story</button>
@@ -1003,7 +966,7 @@ function setShareStatus(text) {
 // On a computer, it downloads the PNG.
 function saveStory() {
   if (!storyFile) {
-    setShareStatus("Your image is still being made. Try again in a second.");
+    setShareStatus("Almost ready. Try again.");
     return;
   }
   const onPhone = window.matchMedia("(pointer: coarse)").matches;
@@ -1023,7 +986,7 @@ function downloadStory() {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setShareStatus("Saved! Open Instagram, start a story, and pick it from your photos.");
+  setShareStatus("Saved!");
 }
 
 // Shares a message + the site link. Falls back to copying it if sharing isn't supported.
@@ -1041,7 +1004,7 @@ function shareWithFriends() {
 function copyLink(text) {
   navigator.clipboard
     .writeText(`${text} ${SITE_URL}`)
-    .then(() => setShareStatus("Link copied. Paste it to your friends!"))
+    .then(() => setShareStatus("Link copied!"))
     .catch(() => setShareStatus(`Copy this link: ${SITE_URL}`));
 }
 
@@ -1168,7 +1131,7 @@ async function makeStoryImage(r) {
   y += 56;
   g.globalAlpha = 0.9;
   g.font = `500 40px ${STORY_FONT}`;
-  g.fillText("This certifies that my face is officially", left, y);
+  g.fillText("My face’s official title:", left, y);
   g.globalAlpha = 1;
 
   g.font = `400 38px ${STORY_FONT}`;
@@ -1237,7 +1200,7 @@ async function makeStoryImage(r) {
   g.fillRect(left, 1626, 480, 3);
   g.globalAlpha = 0.8;
   g.font = `500 26px ${MONO}`;
-  g.fillText("Chief Eyebrow Analyst (not a real doctor)", left, 1666);
+  g.fillText("Not a real doctor", left, 1666);
 
   // Fine print + link
   g.fillText("Accuracy: questionable.", left, 1730);
