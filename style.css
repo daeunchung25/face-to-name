@@ -362,7 +362,7 @@ h1 {
 .confidence { margin-top: 6px; font-family: var(--mono); font-size: .9rem; }
 .confidence b { color: var(--mint); font-weight: 500; }
 
-/* Card paperwork: file number, fake confidence, rubber stamp, fine print */
+/* Card paperwork: file number, rubber stamp, fine print */
 .card { padding-top: 76px; }
 .card > .card-head {
   position: absolute;
@@ -419,3 +419,23 @@ h1 {
   font-family: "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive;
   font-size: 1.7rem;
 }
+
+/* =========================================================
+   The reveal: no more paperwork, just you laughing
+   ========================================================= */
+.card.plain { padding-top: 64px; }
+.reveal-line {
+  margin: 12px 0 18px;
+  font-size: clamp(2.4rem, 10vw, 3.3rem);
+  font-weight: 800;
+  font-variation-settings: "wdth" 80;
+  line-height: .98;
+  letter-spacing: -.03em;
+}
+.gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 16px; }
+.gallery figure { margin: 0; }
+.gallery img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; }
+.gallery.one { grid-template-columns: 1fr; }
+.gallery.one img { aspect-ratio: 4 / 3; }
+.gallery figcaption { margin-top: 4px; font-family: var(--mono); font-size: .68rem; opacity: .7; }
+.gallery-note { margin-top: 12px; font-family: var(--mono); font-size: .72rem; opacity: .6; }
