@@ -122,15 +122,123 @@ const PALETTE = {
   mint: "#7cf2c2", ink: "#1a1033", milk: "#ffffff",
 };
 
-// Big line drawings of facial features, shown behind each card
-const DECO = {
-  face:  `<svg viewBox="0 0 300 300"><path d="M60 95 Q95 68 130 90"/><path d="M170 90 Q205 68 240 95"/><circle cx="95" cy="138" r="10"/><circle cx="205" cy="138" r="10"/><path d="M85 205 Q150 258 215 205"/></svg>`,
-  smile: `<svg viewBox="0 0 300 160"><path d="M30 40 Q150 170 270 40"/></svg>`,
-  frown: `<svg viewBox="0 0 300 160"><path d="M30 130 Q150 10 270 130"/></svg>`,
-  brows: `<svg viewBox="0 0 300 120"><path d="M20 95 Q75 20 135 78"/><path d="M165 78 Q225 20 280 95"/></svg>`,
-  eye:   `<svg viewBox="0 0 300 160"><path d="M20 80 Q150 -10 280 80 Q150 170 20 80Z"/><circle cx="150" cy="80" r="26"/></svg>`,
-  flat:  `<svg viewBox="0 0 300 160"><path d="M40 90 L260 90"/></svg>`,
+// Big, animated facial-feature graphics for the top of each card.
+// Classes like "blink", "look", "bounce" are animated in style.css.
+const W = "#ffffff";
+const ART = {
+  // Two big eyes looking around, with bouncing eyebrows
+  face: (brow, pupil, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="345" cy="45" r="95" fill="${accent}"/>
+    <g class="bounce" fill="none" stroke="${brow}" stroke-width="26" stroke-linecap="round">
+      <path d="M70 72 Q120 32 170 62"/><path d="M230 62 Q280 32 330 72"/>
+    </g>
+    <g class="blink">
+      <ellipse cx="120" cy="150" rx="54" ry="46" fill="${W}"/><ellipse cx="280" cy="150" rx="54" ry="46" fill="${W}"/>
+      <g class="look" fill="${pupil}"><circle cx="120" cy="155" r="22"/><circle cx="280" cy="155" r="22"/></g>
+    </g>
+  </svg>`,
+
+  // A giant smile with blushing cheeks
+  smile: (line, cheeks, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="40" cy="40" r="90" fill="${accent}"/>
+    <g fill="${cheeks}"><circle cx="80" cy="150" r="34"/><circle cx="320" cy="150" r="34"/></g>
+    <path class="bounce" d="M90 95 Q200 250 310 95" fill="none" stroke="${line}" stroke-width="32" stroke-linecap="round"/>
+  </svg>`,
+
+  // Eyebrows going up and down
+  brows: (line, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="350" cy="210" r="90" fill="${accent}"/>
+    <g class="raise" fill="none" stroke="${line}" stroke-width="34" stroke-linecap="round">
+      <path d="M50 120 Q115 50 180 105"/><path d="M220 105 Q285 50 350 120"/>
+    </g>
+    <g fill="${line}"><circle cx="118" cy="190" r="18"/><circle cx="282" cy="190" r="18"/></g>
+  </svg>`,
+
+  // One big eye
+  eye: (pupil, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="60" cy="210" r="80" fill="${accent}"/>
+    <g class="blink">
+      <path d="M40 130 Q200 10 360 130 Q200 250 40 130Z" fill="${W}"/>
+      <g class="look"><circle cx="200" cy="130" r="56" fill="${pupil}"/><circle cx="220" cy="110" r="14" fill="${W}"/></g>
+    </g>
+  </svg>`,
+
+  // Laughing so hard the face shakes
+  laugh: (line, tongue, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="350" cy="40" r="85" fill="${accent}"/>
+    <g class="shake">
+      <g fill="none" stroke="${line}" stroke-width="22" stroke-linecap="round">
+        <path d="M80 110 Q120 60 160 110"/><path d="M240 110 Q280 60 320 110"/>
+      </g>
+      <path d="M115 150 Q200 150 285 150 Q270 250 200 250 Q130 250 115 150Z" fill="${line}"/>
+      <ellipse cx="200" cy="225" rx="40" ry="20" fill="${tongue}"/>
+    </g>
+  </svg>`,
+
+  // Deadpan: dot eyes, flat mouth, slow blink
+  deadpan: (line, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="50" cy="50" r="80" fill="${accent}"/>
+    <g class="blink slow" fill="${line}"><circle cx="130" cy="110" r="20"/><circle cx="270" cy="110" r="20"/></g>
+    <path d="M120 200 L280 200" stroke="${line}" stroke-width="22" stroke-linecap="round"/>
+  </svg>`,
+
+  // A burst of floating features for "Today's vibe"
+  confetti: () => `<svg viewBox="0 0 400 260">
+    <g class="drift">
+      <circle cx="60" cy="50" r="22" fill="${PALETTE.butter}"/>
+      <circle cx="350" cy="70" r="16" fill="${PALETTE.mint}"/>
+      <path d="M300 200 Q330 175 360 195" fill="none" stroke="${PALETTE.bubble}" stroke-width="16" stroke-linecap="round"/>
+      <path d="M30 190 Q55 165 80 185" fill="none" stroke="${PALETTE.lime}" stroke-width="16" stroke-linecap="round"/>
+    </g>
+    <g class="bounce">
+      <g fill="none" stroke="${PALETTE.bubble}" stroke-width="20" stroke-linecap="round">
+        <path d="M120 70 Q150 45 180 65"/><path d="M220 65 Q250 45 280 70"/>
+      </g>
+      <g fill="${PALETTE.mint}"><circle cx="150" cy="110" r="16"/><circle cx="250" cy="110" r="16"/></g>
+      <path d="M140 160 Q200 220 260 160" fill="none" stroke="${PALETTE.butter}" stroke-width="22" stroke-linecap="round"/>
+    </g>
+  </svg>`,
+
+  // A smile that slowly draws itself in
+  drawSmile: () => `<svg viewBox="0 0 400 260">
+    <path class="draw" pathLength="1" d="M90 100 Q200 240 310 100" fill="none" stroke="${PALETTE.butter}" stroke-width="26" stroke-linecap="round"/>
+  </svg>`,
 };
+
+// Five little mood faces in a row; the one you showed most is big and bouncing
+function moodsArt(activeKey) {
+  const ink = PALETTE.ink;
+  const order = ["joy", "surprise", "skeptic", "focus", "neutral"];
+  const faces = order.map((key, i) => {
+    const active = key === activeKey;
+    const r = active ? 46 : 30;
+    const cx = 44 + i * 78;
+    const cy = 130;
+    const e = r * 0.36; // eye offset
+    let features = "";
+    if (key === "joy") {
+      features = `<path d="M${cx - e - 7} ${cy - 4} q7 -9 14 0 M${cx + e - 7} ${cy - 4} q7 -9 14 0" stroke="${ink}" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M${cx - r * 0.4} ${cy + 6} q${r * 0.4} ${r * 0.55} ${r * 0.8} 0Z" fill="${ink}"/>`;
+    } else if (key === "surprise") {
+      features = `<circle cx="${cx - e}" cy="${cy - 6}" r="${r * 0.13}" fill="${ink}"/><circle cx="${cx + e}" cy="${cy - 6}" r="${r * 0.13}" fill="${ink}"/>
+        <ellipse cx="${cx}" cy="${cy + r * 0.38}" rx="${r * 0.17}" ry="${r * 0.22}" fill="${ink}"/>`;
+    } else if (key === "skeptic") {
+      features = `<path d="M${cx - e - 8} ${cy - r * 0.45} l16 -6" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="${cx - e + 4}" cy="${cy - 4}" r="${r * 0.11}" fill="${ink}"/><circle cx="${cx + e + 4}" cy="${cy - 4}" r="${r * 0.11}" fill="${ink}"/>
+        <path d="M${cx - r * 0.3} ${cy + r * 0.4} l${r * 0.6} -${r * 0.12}" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>`;
+    } else if (key === "focus") {
+      features = `<path d="M${cx - e - 8} ${cy - r * 0.42} l14 6 M${cx + e + 8} ${cy - r * 0.42} l-14 6" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="${cx - e}" cy="${cy}" r="${r * 0.11}" fill="${ink}"/><circle cx="${cx + e}" cy="${cy}" r="${r * 0.11}" fill="${ink}"/>
+        <path d="M${cx - r * 0.3} ${cy + r * 0.45} q${r * 0.15} -${r * 0.15} ${r * 0.3} 0 t${r * 0.3} 0" stroke="${ink}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+    } else {
+      features = `<circle cx="${cx - e}" cy="${cy - 2}" r="${r * 0.11}" fill="${ink}"/><circle cx="${cx + e}" cy="${cy - 2}" r="${r * 0.11}" fill="${ink}"/>
+        <path d="M${cx - r * 0.3} ${cy + r * 0.4} h${r * 0.6}" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>`;
+    }
+    const fill = active ? PALETTE.butter : W;
+    return `<g class="${active ? "bounce" : ""}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${ink}" stroke-width="4"/>${features}</g>`;
+  });
+  return `<svg viewBox="0 0 400 260">${faces.join("")}</svg>`;
+}
 
 /* ---------------- DOM ---------------- */
 
@@ -676,10 +784,11 @@ function bars(rows) {
     .join("")}</div>`;
 }
 
-function featureDeco(region) {
-  if (region.endsWith("Brow")) return DECO.brows;
-  if (region.endsWith("Eye")) return DECO.eye;
-  return DECO.smile;
+function featureArt(region) {
+  const P = PALETTE;
+  if (region.endsWith("Brow")) return ART.brows(P.ink, P.lime);
+  if (region.endsWith("Eye")) return ART.eye(P.ink, P.lime);
+  return ART.smile(P.ink, P.bubble, P.lime);
 }
 
 function buildCards(r) {
@@ -695,12 +804,13 @@ function buildCards(r) {
     .sort((a, b) => b.value - a.value);
 
   const emotionRows = Object.keys(EMOTIONS)
-    .map((k) => ({ label: EMOTIONS[k], value: r.emotionPct[k], display: `${r.emotionPct[k]}%` }))
+    .map((k) => ({ key: k, label: EMOTIONS[k], value: r.emotionPct[k], display: `${r.emotionPct[k]}%` }))
     .sort((a, b) => b.value - a.value);
+  const topMood = emotionRows[0].key;
 
   return [
     {
-      bg: P.cobalt, fg: P.milk, deco: DECO.face,
+      bg: P.cobalt, fg: P.milk, art: ART.face(P.bubble, P.ink, P.lilac),
       exhibit: "Intake",
       html: `<p class="kicker">You answered</p>
         <p class="big">${count(QUESTIONS.length, "questions")}</p>
@@ -708,20 +818,20 @@ function buildCards(r) {
         <p class="tap-hint">Tap to continue</p>`,
     },
     {
-      bg: P.butter, fg: P.ink, deco: DECO.smile,
+      bg: P.butter, fg: P.ink, art: ART.smile(P.ink, P.bubble, P.tangerine),
       exhibit: "Exhibit A",
       html: `<p class="kicker">You smiled for</p>
         <p class="big">${count(r.smilePct, "%")}</p>`,
     },
     {
-      bg: P.bubble, fg: P.ink, deco: DECO.brows,
+      bg: P.bubble, fg: P.ink, art: ART.brows(P.ink, P.butter),
       exhibit: "Exhibit B",
       html: `<p class="kicker">You raised your eyebrows</p>
         <p class="big">${count(ev.browRaise, ev.browRaise === 1 ? "time" : "times")}</p>
         ${browBody ? `<p class="body">${browBody}</p>` : ""}`,
     },
     {
-      bg: P.lilac, fg: P.ink, deco: featureDeco(r.topRegion),
+      bg: P.lilac, fg: P.ink, art: featureArt(r.topRegion),
       exhibit: "Exhibit C",
       html: `<p class="kicker">Your most expressive feature</p>
         <p class="big words">${REGIONS[r.topRegion].label}</p>
@@ -729,26 +839,26 @@ function buildCards(r) {
         <p class="body">${REGION_QUIPS[r.topRegion]}</p>`,
     },
     {
-      bg: P.lime, fg: P.ink, deco: DECO.smile,
+      bg: P.lime, fg: P.ink, art: ART.laugh(P.ink, P.bubble, P.sky),
       exhibit: "Exhibit D",
       html: `<p class="kicker">You cracked up during</p>
         <p class="big quote">“${r.funniest.prompt}”</p>`,
     },
     {
-      bg: P.forest, fg: P.milk, deco: DECO.flat,
+      bg: P.forest, fg: P.milk, art: ART.deadpan(P.mint, "#0a4636"),
       exhibit: "Exhibit E",
       html: `<p class="kicker">Straight face during</p>
         <p class="big quote">“${r.calmest.prompt}”</p>`,
     },
     {
-      bg: P.sky, fg: P.ink, deco: DECO.eye,
+      bg: P.sky, fg: P.ink, art: moodsArt(topMood),
       exhibit: "Exhibit F",
       html: `<p class="kicker">Your expression mix</p>
         <p class="big words">Mostly ${emotionRows[0].label.toLowerCase()}</p>
         ${bars(emotionRows)}`,
     },
     {
-      bg: r.award.bg, fg: P.milk, deco: "", certificate: true,
+      bg: r.award.bg, fg: P.milk, art: ART.confetti(), certificate: true,
       exhibit: "Final ruling",
       html: `<p class="kicker">Today’s vibe</p>
         <p class="big words">${r.award.name}</p>
@@ -758,17 +868,16 @@ function buildCards(r) {
           <div><dt>Eyebrow raises</dt><dd>${ev.browRaise}</dd></div>
           <div><dt>Top feature</dt><dd>${REGIONS[r.topRegion].short}</dd></div>
           <div><dt>Expressiveness</dt><dd>${r.score}/100</dd></div>
-        </dl>
-        <p class="signature"><span class="sig">Dr. A. Lgorithm</span>Not a real doctor</p>`,
+        </dl>`,
     },
     {
-      bg: "#0d0d0d", fg: P.milk, deco: "", plain: true,
+      bg: "#0d0d0d", fg: P.milk, art: ART.drawSmile(), plain: true,
       html: `<p class="kicker">Actually…</p>
         <p class="reveal-line">none of this really matters.</p>
         <p class="tap-hint">Tap</p>`,
     },
     {
-      bg: P.milk, fg: P.ink, deco: "", plain: true,
+      bg: P.milk, fg: P.ink, plain: true,
       html: r.photos.length
         ? `<p class="kicker">The important thing is that you smiled.</p>
           <div class="gallery${r.photos.length === 1 ? " one" : ""}">
@@ -782,7 +891,7 @@ function buildCards(r) {
           <p class="body">Run it again and let it out.</p>`,
     },
     {
-      bg: P.tangerine, fg: P.ink, deco: "",
+      bg: P.tangerine, fg: P.ink,
       exhibit: "Release form",
       html: `<p class="kicker">Take it with you</p>
         <img id="storyPreview" class="share-preview" alt="">
@@ -809,7 +918,7 @@ function renderCards(results) {
     .map(
       (c, i) => `<article class="card${c.certificate ? " certificate" : ""}${c.plain ? " plain" : ""}" style="--bg:${c.bg};--fg:${c.fg}"
         aria-roledescription="slide" aria-label="${i + 1} of ${cardData.length}">
-        <div class="deco" aria-hidden="true">${c.deco}</div>
+        ${c.art ? `<div class="art" aria-hidden="true">${c.art}</div>` : ""}
         ${c.plain ? "" : `<div class="card-head" aria-hidden="true">
           <span>File ${results.caseNo} / ${c.exhibit}</span>
         </div>`}
@@ -1007,6 +1116,14 @@ async function makeStoryImage(r) {
   g.fillStyle = r.award.bg;
   g.fillRect(0, 0, STORY_W, STORY_H);
 
+  // Big soft accent circles in the corners
+  g.globalAlpha = 0.35;
+  g.fillStyle = C.lilac;
+  g.beginPath(); g.arc(980, 260, 260, 0, Math.PI * 2); g.fill();
+  g.fillStyle = C.bubble;
+  g.beginPath(); g.arc(80, 1860, 300, 0, Math.PI * 2); g.fill();
+  g.globalAlpha = 1;
+
   // Certificate border (two thin lines)
   g.strokeStyle = C.milk;
   g.globalAlpha = 0.5;
@@ -1045,6 +1162,14 @@ async function makeStoryImage(r) {
   }
   g.strokeStyle = C.butter;
   g.stroke(new Path2D("M85 205 Q150 258 215 205"));
+  g.fillStyle = C.bubble;
+  g.globalAlpha = 0.7;
+  for (const x of [62, 238]) {
+    g.beginPath();
+    g.arc(x, 180, 18, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.globalAlpha = 1;
   g.restore();
 
   // Certificate text + the award name, sized to fit
@@ -1118,16 +1243,10 @@ async function makeStoryImage(r) {
     g.fillText(t.value, x + 32, ty + 142);
   });
 
-  // Signature line
+  // Fine print + link
   g.fillStyle = C.milk;
-  g.font = `italic 56px "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive`;
-  g.fillText("Dr. A. Lgorithm", left, 1610);
-  g.fillRect(left, 1626, 480, 3);
   g.globalAlpha = 0.8;
   g.font = `500 26px ${MONO}`;
-  g.fillText("Not a real doctor", left, 1666);
-
-  // Fine print + link
   g.fillText("Accuracy: questionable.", left, 1730);
   g.globalAlpha = 1;
   g.font = `800 34px ${STORY_FONT}`;
