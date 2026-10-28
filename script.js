@@ -102,26 +102,17 @@ const EMOTIONS = {
   neutral:  "Blank stare",
 };
 
-// The joke award at the end. bg = its color on the card and the story image.
+// Today's vibe at the end: describes the session, not the person. bg = its color.
 const AWARDS = {
-  laugh:   { name: "The Human Laugh Track",       bg: "#4a1a6b",
-             desc: "You laughed at your own answers. Every time." },
-  shock:   { name: "Chief Shock Officer",         bg: "#2233ff",
-             desc: "Everything surprised you. Even your own answers." },
-  sideeye: { name: "The Professional Side-Eyer",  bg: "#0e5c45",
-             desc: "One eyebrow up. Zero trust." },
-  thinker: { name: "The Overthinker in Residence", bg: "#1a1033",
-             desc: "Deep thoughts. Even about pizza." },
-  poker:   { name: "Certified Poker Face",        bg: "#262626",
-             desc: "Your face gave away nothing. Are you okay?" },
-  gif:     { name: "The Walking Reaction GIF",    bg: "#00546b",
-             desc: "Your face doesn’t do subtle." },
-  brows:   { name: "Chief Eyebrow Officer",       bg: "#8a1c4a",
-             desc: "Your eyebrows did the talking." },
-  polite:  { name: "The Customer Service Smile",  bg: "#8a3b12",
-             desc: "Lots of smiles. Few real ones." },
-  sarcasm: { name: "Head of the Sarcasm Department", bg: "#3b3b98",
-             desc: "Lopsided smiles. Rolling eyes." },
+  laugh:   { name: "Laughing at your own answers", bg: "#4a1a6b", desc: "Every single time." },
+  shock:   { name: "Shocked by everything",        bg: "#2233ff", desc: "Even your own answers." },
+  sideeye: { name: "Professional side-eye",        bg: "#0e5c45", desc: "One eyebrow up. Zero trust." },
+  thinker: { name: "Deep in thought",              bg: "#1a1033", desc: "Even about pizza." },
+  poker:   { name: "Poker face",                   bg: "#262626", desc: "Gave away nothing. Are you okay?" },
+  gif:     { name: "Reaction GIF energy",          bg: "#00546b", desc: "Nothing subtle about it." },
+  brows:   { name: "Eyebrows doing the talking",   bg: "#8a1c4a", desc: "They had a lot to say." },
+  polite:  { name: "Customer service smile",       bg: "#8a3b12", desc: "Lots of smiles. Few real ones." },
+  sarcasm: { name: "Sarcasm mode",                 bg: "#3b3b98", desc: "Lopsided smiles. Rolling eyes." },
 };
 const EMOTION_AWARD = { joy: "laugh", surprise: "shock", skeptic: "sideeye", focus: "thinker" };
 
@@ -703,22 +694,6 @@ function buildCards(r) {
   const browBody =
     r.mostBrows && r.mostBrows.browRaises > 0 ? `Mostly during the ${r.mostBrows.short} question.` : "";
 
-  // Laugh audit copy
-  const L = r.laughs;
-  const totalLaughs = L.real + L.polite + L.sarcastic;
-  const laughRows = [
-    { label: "Real laughs", value: L.real, display: String(L.real) },
-    { label: "Polite", value: L.polite, display: String(L.polite) },
-    { label: "Sarcastic", value: L.sarcastic, display: String(L.sarcastic) },
-  ];
-  let laughQuip = "No smiles. Tough crowd.";
-  if (totalLaughs > 0) {
-    const most = laughRows.reduce((a, b) => (b.value > a.value ? b : a));
-    if (most.label === "Sarcastic") laughQuip = "Mostly sarcasm. Impressive.";
-    else if (most.label === "Polite") laughQuip = "Mostly polite. Very professional.";
-    else laughQuip = "Mostly the real thing.";
-  }
-
   const regionRows = Object.keys(REGIONS)
     .map((k) => ({ label: REGIONS[k].short, value: r.regionSpread[k] }))
     .sort((a, b) => b.value - a.value);
@@ -744,23 +719,15 @@ function buildCards(r) {
         <p class="body">${smileBody}</p>`,
     },
     {
-      bg: P.mint, fg: P.ink, deco: DECO.smile,
-      exhibit: "Exhibit B", stamp: "Under review",
-      html: `<p class="kicker">The laugh audit</p>
-        <p class="big">${count(totalLaughs, totalLaughs === 1 ? "smile" : "smiles")}</p>
-        ${bars(laughRows)}
-        <p class="body">${laughQuip}</p>`,
-    },
-    {
       bg: P.bubble, fg: P.ink, deco: DECO.brows,
-      exhibit: "Exhibit C", stamp: "Suspicious",
+      exhibit: "Exhibit B", stamp: "Suspicious",
       html: `<p class="kicker">You raised your eyebrows</p>
         <p class="big">${count(ev.browRaise, ev.browRaise === 1 ? "time" : "times")}</p>
         ${browBody ? `<p class="body">${browBody}</p>` : ""}`,
     },
     {
       bg: P.lilac, fg: P.ink, deco: featureDeco(r.topRegion),
-      exhibit: "Exhibit D", stamp: "Confirmed (probably)",
+      exhibit: "Exhibit C", stamp: "Confirmed (probably)",
       html: `<p class="kicker">Your most expressive feature</p>
         <p class="big words">${REGIONS[r.topRegion].label}</p>
         ${bars(regionRows)}
@@ -768,20 +735,19 @@ function buildCards(r) {
     },
     {
       bg: P.lime, fg: P.ink, deco: DECO.smile,
-      exhibit: "Exhibit E", stamp: "Hilarious (to you)",
+      exhibit: "Exhibit D", stamp: "Hilarious (to you)",
       html: `<p class="kicker">You cracked up during</p>
         <p class="big quote">“${r.funniest.prompt}”</p>`,
     },
     {
       bg: P.forest, fg: P.milk, deco: DECO.flat,
-      exhibit: "Exhibit F", stamp: "Redacted",
+      exhibit: "Exhibit E",
       html: `<p class="kicker">Straight face during</p>
-        <p class="big quote">“${r.calmest.prompt}”</p>
-        <p class="body">Either honest, or <span class="redact">hiding</span> something.</p>`,
+        <p class="big quote">“${r.calmest.prompt}”</p>`,
     },
     {
       bg: P.sky, fg: P.ink, deco: DECO.eye,
-      exhibit: "Exhibit G", stamp: "Very scientific",
+      exhibit: "Exhibit F", stamp: "Very scientific",
       html: `<p class="kicker">Your expression mix</p>
         <p class="big words">Mostly ${emotionRows[0].label.toLowerCase()}</p>
         ${bars(emotionRows)}`,
@@ -789,7 +755,7 @@ function buildCards(r) {
     {
       bg: r.award.bg, fg: P.milk, deco: "", certificate: true,
       exhibit: "Final ruling", stamp: "Official-ish",
-      html: `<p class="kicker">Your face’s official title</p>
+      html: `<p class="kicker">Today’s vibe</p>
         <p class="big words">${r.award.name}</p>
         <p class="body">${r.award.desc}</p>
         <dl class="summary">
@@ -802,20 +768,22 @@ function buildCards(r) {
     },
     {
       bg: "#0d0d0d", fg: P.milk, deco: "", plain: true,
-      html: `<p class="reveal-line">Just in case you haven’t smiled today…</p>
+      html: `<p class="kicker">Actually…</p>
+        <p class="reveal-line">none of this really matters.</p>
         <p class="tap-hint">Tap</p>`,
     },
     {
       bg: P.milk, fg: P.ink, deco: "", plain: true,
       html: r.photos.length
-        ? `<p class="kicker">…you did.</p>
+        ? `<p class="kicker">The important thing is that you smiled.</p>
           <div class="gallery${r.photos.length === 1 ? " one" : ""}">
             ${r.photos
               .map((p) => `<figure><img src="${p.src}" alt="You laughing during the ${p.short} question"><figcaption>${p.short}</figcaption></figure>`)
               .join("")}
           </div>
           <p class="gallery-note">Only on your device.</p>`
-        : `<p class="reveal-line">We didn’t catch one.</p>
+        : `<p class="kicker">The important thing is that you smile.</p>
+          <p class="reveal-line">We didn’t catch one this time.</p>
           <p class="body">Run it again and let it out.</p>`,
     },
     {
@@ -969,7 +937,7 @@ function downloadStory() {
 
 // Shares a message + the site link. Falls back to copying it if sharing isn't supported.
 function shareWithFriends() {
-  const text = `My face just earned the title “${lastResults.award.name}.” Get yours:`;
+  const text = `Today’s vibe: “${lastResults.award.name}.” Get yours:`;
   if (navigator.share) {
     navigator.share({ title: "Face Wrapped", text, url: SITE_URL }).catch((err) => {
       if (err.name !== "AbortError") copyLink(text);
@@ -1109,7 +1077,7 @@ async function makeStoryImage(r) {
   y += 56;
   g.globalAlpha = 0.9;
   g.font = `500 40px ${STORY_FONT}`;
-  g.fillText("My face’s official title:", left, y);
+  g.fillText("Today’s vibe:", left, y);
   g.globalAlpha = 1;
 
   g.font = `400 38px ${STORY_FONT}`;
