@@ -686,9 +686,6 @@ function buildCards(r) {
   const ev = r.events;
   const P = PALETTE;
 
-  // Smile card copy
-  const smileBody = r.smileFrames === 0 ? "Not once. Tough crowd." : `${r.genuinePct}% of them were real.`;
-
   // Eyebrow card copy
   const browBody =
     r.mostBrows && r.mostBrows.browRaises > 0 ? `Mostly during the ${r.mostBrows.short} question.` : "";
@@ -714,8 +711,7 @@ function buildCards(r) {
       bg: P.butter, fg: P.ink, deco: DECO.smile,
       exhibit: "Exhibit A",
       html: `<p class="kicker">You smiled for</p>
-        <p class="big">${count(r.smilePct, "%")}</p>
-        <p class="body">${smileBody}</p>`,
+        <p class="big">${count(r.smilePct, "%")}</p>`,
     },
     {
       bg: P.bubble, fg: P.ink, deco: DECO.brows,
