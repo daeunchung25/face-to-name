@@ -839,12 +839,11 @@ function buildCards(r) {
   const ev = r.events;
   const P = PALETTE;
 
-  // Eyebrow card: show the question that raised them most, like the straight-face card
+  // "Mostly during …" lines for the smile and eyebrow cards
+  const smileQuestion =
+    r.funniest && r.funniest.joyPct > 0 ? `<p class="body">Mostly during “${r.funniest.prompt}”</p>` : "";
   const browQuestion =
-    r.mostBrows && r.mostBrows.browRaises > 0
-      ? `<p class="kicker">Mostly during</p>
-        <p class="big quote">“${r.mostBrows.prompt}”</p>`
-      : "";
+    r.mostBrows && r.mostBrows.browRaises > 0 ? `<p class="body">Mostly during “${r.mostBrows.prompt}”</p>` : "";
 
   const regionRows = Object.keys(REGIONS)
     .map((k) => ({ label: REGIONS[k].short, value: r.regionSpread[k] }))
@@ -868,7 +867,8 @@ function buildCards(r) {
       bg: P.butter, fg: P.ink, art: ART.smile(P.ink, P.bubble, P.tangerine),
       exhibit: "Exhibit A",
       html: `<p class="kicker">You smiled for</p>
-        <p class="big">${count(r.smilePct, "%")}</p>`,
+        <p class="big">${count(r.smilePct, "%")}</p>
+        ${smileQuestion}`,
     },
     {
       bg: P.bubble, fg: P.ink, art: ART.brows(P.ink, P.butter),
