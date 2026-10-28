@@ -17,8 +17,7 @@
       a joke award that admits it's scientifically questionable.
    5. The last card draws a 1080×1920 image for an Instagram story and
       lets you share the site with friends.
-   6. The design is satire: every result looks like official paperwork,
-      with case numbers, rubber stamps, and fine print.
+   6. The design is satire: every result looks like an official case file.
    7. The twist: while you laugh, the site keeps the single best frame of
       each real laugh. After all the fake "analysis", the last cards drop
       the jokes and simply show you yourself laughing, un-mirrored, the way
@@ -705,7 +704,7 @@ function buildCards(r) {
   return [
     {
       bg: P.cobalt, fg: P.milk, deco: DECO.face,
-      exhibit: "Intake", stamp: "Received",
+      exhibit: "Intake",
       html: `<p class="kicker">You answered</p>
         <p class="big">${count(QUESTIONS.length, "questions")}</p>
         <p class="body">Your face had thoughts.</p>
@@ -713,21 +712,21 @@ function buildCards(r) {
     },
     {
       bg: P.butter, fg: P.ink, deco: DECO.smile,
-      exhibit: "Exhibit A", stamp: "Verified*",
+      exhibit: "Exhibit A",
       html: `<p class="kicker">You smiled for</p>
         <p class="big">${count(r.smilePct, "%")}</p>
         <p class="body">${smileBody}</p>`,
     },
     {
       bg: P.bubble, fg: P.ink, deco: DECO.brows,
-      exhibit: "Exhibit B", stamp: "Suspicious",
+      exhibit: "Exhibit B",
       html: `<p class="kicker">You raised your eyebrows</p>
         <p class="big">${count(ev.browRaise, ev.browRaise === 1 ? "time" : "times")}</p>
         ${browBody ? `<p class="body">${browBody}</p>` : ""}`,
     },
     {
       bg: P.lilac, fg: P.ink, deco: featureDeco(r.topRegion),
-      exhibit: "Exhibit C", stamp: "Confirmed (probably)",
+      exhibit: "Exhibit C",
       html: `<p class="kicker">Your most expressive feature</p>
         <p class="big words">${REGIONS[r.topRegion].label}</p>
         ${bars(regionRows)}
@@ -735,7 +734,7 @@ function buildCards(r) {
     },
     {
       bg: P.lime, fg: P.ink, deco: DECO.smile,
-      exhibit: "Exhibit D", stamp: "Hilarious (to you)",
+      exhibit: "Exhibit D",
       html: `<p class="kicker">You cracked up during</p>
         <p class="big quote">“${r.funniest.prompt}”</p>`,
     },
@@ -747,14 +746,14 @@ function buildCards(r) {
     },
     {
       bg: P.sky, fg: P.ink, deco: DECO.eye,
-      exhibit: "Exhibit F", stamp: "Very scientific",
+      exhibit: "Exhibit F",
       html: `<p class="kicker">Your expression mix</p>
         <p class="big words">Mostly ${emotionRows[0].label.toLowerCase()}</p>
         ${bars(emotionRows)}`,
     },
     {
       bg: r.award.bg, fg: P.milk, deco: "", certificate: true,
-      exhibit: "Final ruling", stamp: "Official-ish",
+      exhibit: "Final ruling",
       html: `<p class="kicker">Today’s vibe</p>
         <p class="big words">${r.award.name}</p>
         <p class="body">${r.award.desc}</p>
@@ -818,7 +817,6 @@ function renderCards(results) {
         ${c.plain ? "" : `<div class="card-head" aria-hidden="true">
           <span>File ${results.caseNo} / ${c.exhibit}</span>
         </div>`}
-        ${c.stamp ? `<span class="stamp" aria-hidden="true">${c.stamp}</span>` : ""}
         ${c.html}
         ${c.fine ? `<p class="fineprint">${c.fine}</p>` : ""}
       </article>`
@@ -1052,21 +1050,6 @@ async function makeStoryImage(r) {
   g.strokeStyle = C.butter;
   g.stroke(new Path2D("M85 205 Q150 258 215 205"));
   g.restore();
-
-  // Rubber stamp, tilted
-  g.save();
-  g.translate(830, 540);
-  g.rotate(-0.2);
-  g.strokeStyle = C.butter;
-  g.fillStyle = C.butter;
-  g.lineWidth = 6;
-  roundedRect(g, -150, -50, 300, 100, 14);
-  g.stroke();
-  g.font = `500 40px ${MONO}`;
-  g.textAlign = "center";
-  g.fillText("OFFICIAL-ISH", 0, 14);
-  g.restore();
-  g.textAlign = "left";
 
   // Certificate text + the award name, sized to fit
   let y = 680;
