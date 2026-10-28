@@ -182,26 +182,53 @@ const ART = {
     <path d="M120 200 L280 200" stroke="${line}" stroke-width="22" stroke-linecap="round"/>
   </svg>`,
 
-  // A burst of floating features for "Today's vibe"
-  confetti: () => `<svg viewBox="0 0 400 260">
-    <g class="drift">
-      <circle cx="60" cy="50" r="22" fill="${PALETTE.butter}"/>
-      <circle cx="350" cy="70" r="16" fill="${PALETTE.mint}"/>
-      <path d="M300 200 Q330 175 360 195" fill="none" stroke="${PALETTE.bubble}" stroke-width="16" stroke-linecap="round"/>
-      <path d="M30 190 Q55 165 80 185" fill="none" stroke="${PALETTE.lime}" stroke-width="16" stroke-linecap="round"/>
+  // Shocked: wide eyes, raised brows, "O" mouth
+  shock: (line, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="350" cy="50" r="80" fill="${accent}"/>
+    <g class="bounce" fill="none" stroke="${line}" stroke-width="20" stroke-linecap="round">
+      <path d="M75 55 Q120 20 165 50"/><path d="M235 50 Q280 20 325 55"/>
     </g>
-    <g class="bounce">
-      <g fill="none" stroke="${PALETTE.bubble}" stroke-width="20" stroke-linecap="round">
-        <path d="M120 70 Q150 45 180 65"/><path d="M220 65 Q250 45 280 70"/>
-      </g>
-      <g fill="${PALETTE.mint}"><circle cx="150" cy="110" r="16"/><circle cx="250" cy="110" r="16"/></g>
-      <path d="M140 160 Q200 220 260 160" fill="none" stroke="${PALETTE.butter}" stroke-width="22" stroke-linecap="round"/>
+    <g class="blink">
+      <circle cx="120" cy="115" r="42" fill="${W}"/><circle cx="280" cy="115" r="42" fill="${W}"/>
+      <g fill="${PALETTE.ink}"><circle cx="120" cy="115" r="12"/><circle cx="280" cy="115" r="12"/></g>
     </g>
+    <ellipse class="bounce" cx="200" cy="212" rx="30" ry="36" fill="${line}"/>
   </svg>`,
 
-  // A smile that slowly draws itself in
-  drawSmile: () => `<svg viewBox="0 0 400 260">
-    <path class="draw" pathLength="1" d="M90 100 Q200 240 310 100" fill="none" stroke="${PALETTE.butter}" stroke-width="26" stroke-linecap="round"/>
+  // Side-eye: one brow up, eyes looking sideways, half smile
+  sideeye: (line, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="50" cy="210" r="80" fill="${accent}"/>
+    <g fill="none" stroke="${line}" stroke-width="20" stroke-linecap="round">
+      <path class="raise" d="M75 60 Q120 25 165 55"/><path d="M235 80 L325 80"/>
+    </g>
+    <ellipse cx="120" cy="128" rx="46" ry="30" fill="${W}"/><ellipse cx="280" cy="128" rx="46" ry="30" fill="${W}"/>
+    <g class="look" fill="${PALETTE.ink}"><circle cx="145" cy="128" r="16"/><circle cx="305" cy="128" r="16"/></g>
+    <path d="M140 210 Q210 215 265 190" fill="none" stroke="${line}" stroke-width="18" stroke-linecap="round"/>
+  </svg>`,
+
+  // Deep in thought: furrowed brows, wavy mouth
+  thinker: (line, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="345" cy="45" r="85" fill="${accent}"/>
+    <g fill="none" stroke="${line}" stroke-width="22" stroke-linecap="round">
+      <path d="M80 70 L160 95"/><path d="M320 70 L240 95"/>
+    </g>
+    <g class="blink slow" fill="${line}"><circle cx="125" cy="135" r="18"/><circle cx="275" cy="135" r="18"/></g>
+    <path class="shake" d="M130 210 q23 -18 46 0 t46 0 t46 0" fill="none" stroke="${line}" stroke-width="16" stroke-linecap="round"/>
+  </svg>`,
+
+  // Customer service smile: a big smile, but the eyes don't join in
+  polite: (line, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="40" cy="40" r="80" fill="${accent}"/>
+    <g class="blink" fill="${line}"><circle cx="130" cy="100" r="18"/><circle cx="270" cy="100" r="18"/></g>
+    <path d="M100 160 Q200 230 300 160" fill="none" stroke="${line}" stroke-width="24" stroke-linecap="round"/>
+  </svg>`,
+
+  // Sarcasm: eyes rolling up, lopsided smirk
+  smirk: (line, accent) => `<svg viewBox="0 0 400 260">
+    <circle class="drift" cx="350" cy="210" r="80" fill="${accent}"/>
+    <circle cx="125" cy="110" r="38" fill="${W}"/><circle cx="275" cy="110" r="38" fill="${W}"/>
+    <g class="look" fill="${PALETTE.ink}"><circle cx="125" cy="90" r="14"/><circle cx="275" cy="90" r="14"/></g>
+    <path d="M130 205 Q220 215 285 175" fill="none" stroke="${line}" stroke-width="22" stroke-linecap="round"/>
   </svg>`,
 };
 
@@ -748,7 +775,8 @@ function buildResults() {
     mostBrows,
     score,
   };
-  r.award = AWARDS[pickAward(r)];
+  r.awardKey = pickAward(r);
+  r.award = AWARDS[r.awardKey];
   return r;
 }
 
@@ -784,6 +812,22 @@ function bars(rows) {
     .join("")}</div>`;
 }
 
+// The "Today's vibe" picture matches the vibe it describes
+function vibeArt(key) {
+  const P = PALETTE;
+  switch (key) {
+    case "laugh":   return ART.laugh(P.butter, P.bubble, P.lilac);
+    case "shock":   return ART.shock(P.milk, P.sky);
+    case "sideeye": return ART.sideeye(P.mint, P.lime);
+    case "thinker": return ART.thinker(P.lilac, P.sky);
+    case "gif":     return ART.face(P.bubble, P.ink, P.tangerine);
+    case "brows":   return ART.brows(P.milk, P.bubble);
+    case "polite":  return ART.polite(P.butter, P.tangerine);
+    case "sarcasm": return ART.smirk(P.milk, P.lilac);
+    default:        return ART.deadpan(P.milk, "#3a3a3a"); // poker face
+  }
+}
+
 function featureArt(region) {
   const P = PALETTE;
   if (region.endsWith("Brow")) return ART.brows(P.ink, P.lime);
@@ -795,9 +839,12 @@ function buildCards(r) {
   const ev = r.events;
   const P = PALETTE;
 
-  // Eyebrow card copy
-  const browBody =
-    r.mostBrows && r.mostBrows.browRaises > 0 ? `Mostly during the ${r.mostBrows.short} question.` : "";
+  // Eyebrow card: show the question that raised them most, like the straight-face card
+  const browQuestion =
+    r.mostBrows && r.mostBrows.browRaises > 0
+      ? `<p class="kicker">Mostly during</p>
+        <p class="big quote">“${r.mostBrows.prompt}”</p>`
+      : "";
 
   const regionRows = Object.keys(REGIONS)
     .map((k) => ({ label: REGIONS[k].short, value: r.regionSpread[k] }))
@@ -828,7 +875,7 @@ function buildCards(r) {
       exhibit: "Exhibit B",
       html: `<p class="kicker">You raised your eyebrows</p>
         <p class="big">${count(ev.browRaise, ev.browRaise === 1 ? "time" : "times")}</p>
-        ${browBody ? `<p class="body">${browBody}</p>` : ""}`,
+        ${browQuestion}`,
     },
     {
       bg: P.lilac, fg: P.ink, art: featureArt(r.topRegion),
@@ -858,7 +905,7 @@ function buildCards(r) {
         ${bars(emotionRows)}`,
     },
     {
-      bg: r.award.bg, fg: P.milk, art: ART.confetti(), certificate: true,
+      bg: r.award.bg, fg: P.milk, art: vibeArt(r.awardKey), certificate: true,
       exhibit: "Final ruling",
       html: `<p class="kicker">Today’s vibe</p>
         <p class="big words">${r.award.name}</p>
@@ -871,7 +918,7 @@ function buildCards(r) {
         </dl>`,
     },
     {
-      bg: "#0d0d0d", fg: P.milk, art: ART.drawSmile(), plain: true,
+      bg: "#0d0d0d", fg: P.milk, plain: true,
       html: `<p class="kicker">Actually…</p>
         <p class="reveal-line">none of this really matters.</p>
         <p class="tap-hint">Tap</p>`,
